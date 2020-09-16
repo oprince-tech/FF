@@ -15,6 +15,7 @@ positionID = {
         4: 'TE', 5: 'K', 16: 'DST'
 }
 
+
 class Colors:
     BLACK = '\033[90m'
     RED = '\033[91m'
@@ -33,12 +34,13 @@ class Roster:
         self.roster = []
 
     def generate_roster(self, json_roster):
-        print("Adding players to roster...")
+        print("\nAdding players to roster...")
         for team in d['teams']:
             if team['id'] == 9:
                 for p in team['roster']['entries']:
                     name = p['playerPoolEntry']['player']['fullName']
                     slot = slotID[p['lineupSlotId']]
+                    slot_id = p['lineupSlotId']
                     starting = False if slot == 'Bench' else True
                     pos = positionID[p['playerPoolEntry']['player']['defaultPositionId']]
                     proj, score = 0, 0
@@ -56,16 +58,17 @@ class Roster:
                     except:
                         pass
 
-                    player = Player(name, slot, pos, starting, proj, score, status)
+                    player = Player(name, slot, slot_id, pos, starting, proj, score, status)
 
                     self.roster.append(player)
 
 
     def sort_roster(self):
-        self.roster.sort(key=operator.attrgetter('slot'), reverse=True)
+        self.roster.sort(key=operator.attrgetter('slot_id'))
 
 
     def decide_flex(self):
+        print("Deciding flex position...")
         flex_ok = ["RB", "WR", "TE"]
         flex_spot = list(
                     filter(lambda x: x.pos in flex_ok and not x.starting,
@@ -81,10 +84,12 @@ class Roster:
             current_flex[0].shouldStart = True
             flex = current_flex[0]
 
+        flex.slot_id = 15
         return flex
 
 
     def decide_lineup(self):
+        print("Deciding best lineup...")
         position_spots = {
                 "QB": 1, "RB": 2, "WR": 2,
                 "TE": 1, "DST": 1, "K": 1,
@@ -108,15 +113,19 @@ class Roster:
                     print(f"Skipping {pos}")
 
     def print_roster(self):
+        header = ("\n{}{:>12}{:>18}{:>12}").format('Slot', 'Player', 'Proj', 'Score')
+        print(header)
+        print("----------------------------------------------")
         for p in self.roster:
             print(p)
 
 
 class Player(Roster):
-    def __init__(self, name, slot, pos, starting, proj, score, status):
+    def __init__(self, name, slot, slot_id, pos, starting, proj, score, status):
         self.first = name.split(" ")[0]
         self.last = name.split(" ")[1]
         self.slot = slot
+        self.slot_id = slot_id
         self.pos = pos.upper()
         self.starting = starting
         self.shouldStart = False
@@ -143,14 +152,14 @@ class Player(Roster):
         return f"{self.color_starting}" \
                f"{self.slot}" \
                f"{Colors.ENDC}:\t" \
-               f"{self.color_status}" \
+               f"{self.color_status :<8}" \
                f"{self.first[0]}. " \
-               f"{self.last}  " \
+               f"{self.last}" \
                f"{Colors.ENDC}\t" \
                f"{self.color_shouldStart}" \
                f"({self.proj})" \
                f"{Colors.ENDC}\t" \
-               f"{self.score}"
+               f"{self.score :>5}".expandtabs(tabsize=16)
 
 
 def ID_check(LID, TID):
