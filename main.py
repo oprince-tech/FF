@@ -33,10 +33,10 @@ class Roster:
     def __init__(self):
         self.roster = []
 
-    def generate_roster(self, json_roster):
+    def generate_roster(self, json_roster, TID):
         print("\nAdding players to roster...")
         for team in d['teams']:
-            if team['id'] == 9:
+            if team['id'] == TID:
                 for p in team['roster']['entries']:
                     name = p['playerPoolEntry']['player']['fullName']
                     slot = slotID[p['lineupSlotId']]
@@ -214,14 +214,15 @@ if __name__ == '__main__':
     except Exception as e:
         print(e)
 
+
     try:
-        with open(f"weekly_data/FF_wk-{wk}.json", "r") as rf:
+        with open("weekly_data/FF_wk-2.json", "r") as rf:
             d = json.load(rf)
     except Exception as e:
         print(e)
 
     myTeam = Roster()
-    myTeam.generate_roster(d)
+    myTeam.generate_roster(d, ID['TID'])
     myTeam.decide_lineup()
     myTeam.sort_roster()
     myTeam.print_roster()
