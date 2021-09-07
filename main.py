@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import json
 import operator
@@ -5,8 +7,7 @@ import os
 import re
 import sys
 
-import requests
-# from pathlib import Path
+import requests  # type: ignore
 
 
 slotID = {
@@ -36,9 +37,9 @@ class Colors:
 
 class Roster:
     def __init__(self) -> None:
-        self.roster = []
+        self.roster: list[Player] = []
 
-    def generate_roster(self, d, TID):
+    def generate_roster(self, d: dict, TID: int) -> None:
         print('\nAdding players to roster...')
         for team in d['teams']:
             if team['id'] == TID:
@@ -72,20 +73,25 @@ class Roster:
 
                     self.roster.append(player)
 
-    def sort_roster(self):
+    def sort_roster(self) -> None:
         self.roster.sort(key=operator.attrgetter('slot_id'))
 
-    def decide_flex(self):
+    def decide_flex(self) -> Player:
         print('Deciding flex position...')
         flex_ok = ['RB', 'WR', 'TE']
-        flex_spot = list(
+        flex_spot: list = list(
             filter(
                 lambda x: x.pos in flex_ok and not x.starting,
                 self.roster,
             ),
         )
         flex = flex_spot[0]
-        current_flex = list(filter(lambda x: x.slot == 'FLEX', self.roster))
+        current_flex: list = list(
+            filter(
+                lambda x: x.slot == 'FLEX',
+                self.roster,
+            ),
+        )
 
         if flex.proj > current_flex[0].proj:
             flex.shouldStart = True
@@ -98,7 +104,7 @@ class Roster:
         flex.slot_id = 15
         return flex
 
-    def decide_lineup(self):
+    def decide_lineup(self) -> None:
         print('Deciding best lineup...')
         position_spots = {
             'QB': 1, 'RB': 2, 'WR': 2,
@@ -126,7 +132,7 @@ class Roster:
                 except IndexError:
                     print(f'Skipping {pos}')
 
-    def print_roster(self):
+    def print_roster(self) -> None:
         header = ('\n{}{:>12}{:>18}{:>12}').format(
             'Slot', 'Player', 'Proj', 'Score',
         )
@@ -138,9 +144,9 @@ class Roster:
 
 class Player(Roster):
     def __init__(
-        self, name, slot, slot_id, pos,
-        starting, proj, score, status,
-    ):
+        self, name: str, slot: str, slot_id: int, pos: str,
+        starting: bool, proj: float, score: float, status: str,
+    ) -> None:
         self.first = name.split(' ')[0]
         self.last = name.split(' ')[1]
         self.slot = slot
@@ -152,7 +158,7 @@ class Player(Roster):
         self.score = round(score, 1)
         self.status = status
 
-    def apply_color(self):
+    def apply_color(self) -> None:
         color_starting = {True: Colors.BLUE, False: Colors.BLACK}
         color_shouldStart = {True: Colors.CYAN, False: Colors.BLACK}
         color_status = {
@@ -165,7 +171,7 @@ class Player(Roster):
         self.color_status = color_status[self.status]
         self.color_shouldStart = color_shouldStart[self.shouldStart]
 
-    def __str__(self):
+    def __str__(self) -> str:
         self.apply_color()
         return f'{self.color_starting}' \
                f'{self.slot}' \
@@ -180,22 +186,24 @@ class Player(Roster):
                f'{self.score :>5}'.expandtabs(tabsize=16)
 
 
-def load_cookies(key=None):
+def load_cookies(key: str = None) -> int | dict:
     with open('cookies-dev.json') as rc:
         c = json.load(rc)
-    return c[key] if key else c
+    return int(c[key]) if key else c
 
-def save_weekly_data(d, wk):
+
+def save_weekly_data(d: dict, wk: int) -> None:
     try:
-        with open(f"./weekly_data/FF_wk-{wk}.json", "w") as wf:
+        with open(f'./weekly_data/FF_wk-{wk}.json', 'w') as wf:
             json.dump(d, wf)
     except Exception as e:
         print(e)
 
-def connect_FF(LID: int, wk: int) -> dict[str, str]:
+
+def connect_FF(LID: int, wk: int) -> dict:
     c = load_cookies()
-    swid = c['SWID']
-    espn_s2 = c['espn_s2']
+    swid = c['SWID']  # type: ignore
+    espn_s2 = c['espn_s2']  # type: ignore
     url = f'''https://fantasy.espn.com/apis/v3/games/ffl/seasons/2020/
               segments/0/leagues/{LID}?view=mMatchup&view=mMatchupScore'''
 
@@ -215,7 +223,7 @@ def last_updated_week() -> int:
     wks = os.listdir('./weekly_data')
     most_current = 0
     for wk in wks:
-        wk_num = int(re.search(r'wk-(\d)', wk).group(1))
+        wk_num = int(re.search(r'wk-(\d)', wk).group(1))  # type: ignore
         most_current = wk_num if wk_num > most_current else most_current
     return int(most_current)
 
@@ -251,14 +259,14 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def main():
+def main() -> None:
     args = parse_args()
     if not args.week:
         args.week = last_updated_week()
     if not args.league_id:
-        args.league_id = int(load_cookies(key='LID'))
+        args.league_id = load_cookies(key='LID')
     if not args.team_id:
-        args.team_id = int(load_cookies(key='TID'))
+        args.team_id = load_cookies(key='TID')
     if not args.pull:
         try:
             with open(
@@ -270,8 +278,7 @@ def main():
             print(e)
     else:
         d = connect_FF(args.league_id, args.week)
-        save_weekly_data(d)
-
+        save_weekly_data(d, args.week)
     myTeam = Roster()
     myTeam.generate_roster(d, args.team_id)
     myTeam.decide_lineup()
