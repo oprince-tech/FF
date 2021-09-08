@@ -5,7 +5,6 @@ import json
 import operator
 import os
 import re
-import sys
 
 import requests  # type: ignore
 
@@ -54,8 +53,6 @@ class Roster:
                     ]
                     proj, score = 0, 0
                     for stat in p['playerPoolEntry']['player']['stats']:
-                        if stat['scoringPeriodId'] != 2:
-                            continue
                         if stat['statSourceId'] == 0:
                             score = stat['appliedTotal']
                         elif stat['statSourceId'] == 1:
@@ -192,9 +189,12 @@ def load_cookies(key: str = None) -> int | dict:
     return int(c[key]) if key else c
 
 
-def save_weekly_data(d: dict, wk: int) -> None:
+def save_weekly_data(d: dict, year: int, LID: int, TID: int, wk: int) -> None:
     try:
-        with open(f'./weekly_data/FF_wk-{wk}.json', 'w') as wf:
+        with open(
+            f'./weekly_data/FF_{year}_{LID}_{TID}_wk-{wk}.json',
+            'w',
+        ) as wf:
             json.dump(d, wf)
     except Exception as e:
         print(e)
@@ -202,21 +202,25 @@ def save_weekly_data(d: dict, wk: int) -> None:
 
 def connect_FF(LID: int, wk: int) -> dict:
     c = load_cookies()
+    year = c['season']  # type: ignore
     swid = c['SWID']  # type: ignore
     espn_s2 = c['espn_s2']  # type: ignore
-    url = f'''https://fantasy.espn.com/apis/v3/games/ffl/seasons/2020/
-              segments/0/leagues/{LID}?view=mMatchup&view=mMatchupScore'''
+
+    url = (
+        f'https://fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/'
+        'segments/0/leagues/131034?view=mMatchup&view=mMatchupScore'
+    )
 
     try:
         r = requests.get(
-            url, params={'scoringPeriodId': wk},
+            url, params={'scoringPeriodId': str(wk)},
             cookies={'SWID': swid, 'espn_s2': espn_s2},
         )
         d = r.json()
         return d
 
     except requests.exceptions.RequestException as e:
-        sys.exit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
+        raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
 def last_updated_week() -> int:
@@ -261,6 +265,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    year = load_cookies(key='season')
     if not args.week:
         args.week = last_updated_week()
     if not args.league_id:
@@ -270,21 +275,26 @@ def main() -> None:
     if not args.pull:
         try:
             with open(
-                '''./weekly_data/FF_2020_'''
-                f'''{args.league_id}_wk-{args.week}.json''',
+                f'''./weekly_data/FF_{year}_'''
+                f'''{args.league_id}_{args.team_id}_wk-{args.week}.json''',
             ) as rf:
                 d = json.load(rf)
-        except Exception as e:
-            print(e)
+        except FileNotFoundError as e:
+            raise SystemExit(f'{Colors.RED}{e}{Colors.ENDC}')
     else:
         d = connect_FF(args.league_id, args.week)
-        save_weekly_data(d, args.week)
+        save_weekly_data(
+            d, year, args.league_id,  # type: ignore
+            args.team_id, args.week,
+        )
     myTeam = Roster()
     myTeam.generate_roster(d, args.team_id)
     myTeam.decide_lineup()
     myTeam.sort_roster()
     myTeam.print_roster()
 
+    return 0
+
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit(main())
