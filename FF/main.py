@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import pkg_resources # type: ignore
 import argparse
 import json
 import operator
@@ -184,20 +184,30 @@ class Player(Roster):
 
 
 def load_cookies(key: str = None) -> int | dict:
-    with open('cookies-dev.json') as rc:
-        c = json.load(rc)
-    return int(c[key]) if key else c
+    try:
+        path = pkg_resources.resource_filename(__name__, 'data/cookies.json')
+        with open(path) as rc:
+            c = json.load(rc)
+        return int(c[key]) if key else c
+    except ValueError as e:
+        raise SystemExit(f'{Colors.RED}{type(e).__name__}: '
+                         'Error loading from your cookies.json file. '
+                         'Ensure all the fields are filled out.'
+                         f'{Colors.ENDC}')
+    except FileNotFoundError as e:
+        raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
 def save_weekly_data(d: dict, year: int, LID: int, TID: int, wk: int) -> None:
     try:
+        path = pkg_resources.resource_filename(__name__, 'data/weekly_data')
         with open(
-            f'./weekly_data/FF_{year}_{LID}_{TID}_wk-{wk}.json',
+            f'{path}/FF_{year}_{LID}_{TID}_wk-{wk}.json',
             'w',
         ) as wf:
             json.dump(d, wf)
-    except Exception as e:
-        print(e)
+    except FileNotFoundError as e:
+        raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
 def connect_FF(LID: int, wk: int) -> dict:
@@ -208,7 +218,7 @@ def connect_FF(LID: int, wk: int) -> dict:
 
     url = (
         f'https://fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/'
-        'segments/0/leagues/131034?view=mMatchup&view=mMatchupScore'
+        f'segments/0/leagues/{LID}?view=mMatchup&view=mMatchupScore'
     )
 
     try:
@@ -224,7 +234,13 @@ def connect_FF(LID: int, wk: int) -> dict:
 
 
 def last_updated_week() -> int:
-    wks = os.listdir('./weekly_data')
+    try:
+        path = pkg_resources.resource_filename(__name__, 'data/weekly_data')
+        wks = os.listdir(path)
+    except FileNotFoundError as e:
+        raise SystemExit(f'{Colors.RED}{type(e).__name__}: '
+                         f'{e}. Data must be pulled first. [ff --pull]'
+                         f'{Colors.ENDC}')
     most_current = 0
     for wk in wks:
         wk_num = int(re.search(r'wk-(\d)', wk).group(1))  # type: ignore
@@ -263,24 +279,27 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def main() -> None:
+def main() -> int:
     args = parse_args()
     year = load_cookies(key='season')
     if not args.week:
         args.week = last_updated_week()
     if not args.league_id:
-        args.league_id = load_cookies(key='LID')
+        args.league_id = load_cookies(key='league_id')
     if not args.team_id:
-        args.team_id = load_cookies(key='TID')
+        args.team_id = load_cookies(key='team_id')
     if not args.pull:
         try:
+            path = pkg_resources.resource_filename(__name__, 'data/weekly_data')
             with open(
-                f'''./weekly_data/FF_{year}_'''
+                f'''{path}/FF_{year}_'''
                 f'''{args.league_id}_{args.team_id}_wk-{args.week}.json''',
             ) as rf:
                 d = json.load(rf)
         except FileNotFoundError as e:
-            raise SystemExit(f'{Colors.RED}{e}{Colors.ENDC}')
+            raise SystemExit(f'{Colors.RED}{type(e).__name__}: '
+                             f'{e}. Data must be pulled first. [ff --pull]'
+                             f'{Colors.ENDC}')
     else:
         d = connect_FF(args.league_id, args.week)
         save_weekly_data(

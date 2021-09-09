@@ -2,3 +2,5 @@ cookies-dev.json
 weekly_data/*
 /venv
 .mypy_cache
+__pycache__
+FF.egg-info
