@@ -11,7 +11,7 @@ import requests  # type: ignore
 
 COOKIES_PATH = pkg_resources.resource_filename(
     __name__,
-    'data/cookies.json',
+    'data/cookies-dev.json',
 )
 WEEKLY_DATA_PATH = pkg_resources.resource_filename(
     __name__,
@@ -69,13 +69,14 @@ class Roster:
                             proj = stat['appliedTotal']
 
                     status = 'ACTIVE'
+                    rosterLocked = p['playerPoolEntry']['rosterLocked']
                     try:
                         status = p['playerPoolEntry']['player']['injuryStatus']
                     except KeyError:
                         pass
                     player = Player(
                         name, slot, slot_id, pos,
-                        starting, proj, score, status,
+                        starting, proj, score, status, rosterLocked
                     )
 
                     self.roster.append(player)
@@ -153,6 +154,7 @@ class Player(Roster):
     def __init__(
         self, name: str, slot: str, slot_id: int, pos: str,
         starting: bool, proj: float, score: float, status: str,
+        rosterLocked: bool
     ) -> None:
         self.first = name.split(' ')[0]
         self.last = name.split(' ')[1]
@@ -164,10 +166,19 @@ class Player(Roster):
         self.proj = round(proj, 1)
         self.score = round(score, 1)
         self.status = status
+        self.rosterLocked = rosterLocked
+        self.performance = 'NAN'
+        self.performance_check()
 
     def apply_color(self) -> None:
         color_starting = {True: Colors.BLUE, False: Colors.BLACK}
         color_shouldStart = {True: Colors.CYAN, False: Colors.BLACK}
+        color_performance = {
+            'LOW': Colors.RED,
+            'MID': Colors.YELLOW,
+            'HIGH': Colors.GREEN,
+            'NAN': Colors.BWHITE
+        }
         color_status = {
             'ACTIVE': Colors.GREEN,
             'QUESTIONABLE': Colors.YELLOW,
@@ -177,7 +188,22 @@ class Player(Roster):
         self.color_starting = color_starting[self.starting]
         self.color_status = color_status[self.status]
         self.color_shouldStart = color_shouldStart[self.shouldStart]
+        self.color_performance = color_performance[self.performance]
 
+    def performance_check(self) -> None:
+        print(f'{self.rosterLocked=}')
+        if self.rosterLocked:
+            print(f'{self.score=}')
+            print(f'{self.proj=}')
+            if self.score < self.proj:
+                self.performance = 'LOW'
+            elif self.score == self.proj:
+                self.performance = 'MID'
+            elif self.score > self.proj:
+                self.performance = 'HIGH'
+            else:
+                self.performance = 'NAN'
+        print(f'{self.performance=}')
     def __str__(self) -> str:
         self.apply_color()
         return f'{self.color_starting}' \
@@ -190,8 +216,9 @@ class Player(Roster):
                f'{self.color_shouldStart}' \
                f'({self.proj})' \
                f'{Colors.ENDC}\t' \
-               f'{self.score :>5}'.expandtabs(tabsize=16)
-
+               f'{self.color_performance}' \
+               f'{self.score :>5}' \
+               f'{Colors.ENDC}'.expandtabs(tabsize=16)
 
 def load_cookies(key: str = None) -> int | dict:
     try:
@@ -202,7 +229,7 @@ def load_cookies(key: str = None) -> int | dict:
         print_cookies()
         raise SystemExit(
             f'{Colors.RED}{type(e).__name__}: '
-            'Error loading from your cookies.json file. '
+            'Error loading from your cookies file. '
             'Ensure all the fields are filled out.'
             f'{Colors.ENDC}',
         )
@@ -213,7 +240,7 @@ def load_cookies(key: str = None) -> int | dict:
 def save_weekly_data(d: dict, year: int, LID: int, TID: int, wk: int) -> None:
     try:
         with open(
-            f'{WEEKLY_DATA_PATH}/FF_{year}_{LID}_{TID}_wk-{wk}.json',
+            f'{WEEKLY_DATA_PATH}/FF_{year}_{LID}_wk-{wk}.json',
             'w',
         ) as wf:
             json.dump(d, wf)
