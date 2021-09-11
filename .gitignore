@@ -4,3 +4,4 @@ weekly_data/*
 .mypy_cache
 __pycache__
 FF.egg-info
+FF_20*

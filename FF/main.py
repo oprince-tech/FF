@@ -1,13 +1,22 @@
 from __future__ import annotations
-import pkg_resources # type: ignore
+
 import argparse
 import json
 import operator
 import os
 import re
 
+import pkg_resources  # type: ignore
 import requests  # type: ignore
 
+COOKIES_PATH = pkg_resources.resource_filename(
+    __name__,
+    'data/cookies.json',
+)
+WEEKLY_DATA_PATH = pkg_resources.resource_filename(
+    __name__,
+    'data/weekly_data',
+)
 
 slotID = {
     0: 'QB', 2: 'RB', 4: 'WR',
@@ -35,13 +44,14 @@ class Colors:
 
 
 class Roster:
-    def __init__(self) -> None:
+    def __init__(self, TID: int) -> None:
         self.roster: list[Player] = []
+        self.TID = TID
 
-    def generate_roster(self, d: dict, TID: int) -> None:
+    def generate_roster(self, d: dict) -> None:
         print('\nAdding players to roster...')
         for team in d['teams']:
-            if team['id'] == TID:
+            if team['id'] == self.TID:
                 for p in team['roster']['entries']:
                     name = p['playerPoolEntry']['player']['fullName']
                     slot = slotID[p['lineupSlotId']]
@@ -185,24 +195,25 @@ class Player(Roster):
 
 def load_cookies(key: str = None) -> int | dict:
     try:
-        path = pkg_resources.resource_filename(__name__, 'data/cookies.json')
-        with open(path) as rc:
+        with open(COOKIES_PATH) as rc:
             c = json.load(rc)
         return int(c[key]) if key else c
     except ValueError as e:
-        raise SystemExit(f'{Colors.RED}{type(e).__name__}: '
-                         'Error loading from your cookies.json file. '
-                         'Ensure all the fields are filled out.'
-                         f'{Colors.ENDC}')
+        print_cookies()
+        raise SystemExit(
+            f'{Colors.RED}{type(e).__name__}: '
+            'Error loading from your cookies.json file. '
+            'Ensure all the fields are filled out.'
+            f'{Colors.ENDC}',
+        )
     except FileNotFoundError as e:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
 def save_weekly_data(d: dict, year: int, LID: int, TID: int, wk: int) -> None:
     try:
-        path = pkg_resources.resource_filename(__name__, 'data/weekly_data')
         with open(
-            f'{path}/FF_{year}_{LID}_{TID}_wk-{wk}.json',
+            f'{WEEKLY_DATA_PATH}/FF_{year}_{LID}_{TID}_wk-{wk}.json',
             'w',
         ) as wf:
             json.dump(d, wf)
@@ -235,17 +246,64 @@ def connect_FF(LID: int, wk: int) -> dict:
 
 def last_updated_week() -> int:
     try:
-        path = pkg_resources.resource_filename(__name__, 'data/weekly_data')
-        wks = os.listdir(path)
+        wks = os.listdir(WEEKLY_DATA_PATH)
     except FileNotFoundError as e:
-        raise SystemExit(f'{Colors.RED}{type(e).__name__}: '
-                         f'{e}. Data must be pulled first. [ff --pull]'
-                         f'{Colors.ENDC}')
+        raise SystemExit(
+            f'{Colors.RED}{type(e).__name__}: '
+            f'{e}. Data must be pulled first. [ff --pull]'
+            f'{Colors.ENDC}',
+        )
     most_current = 0
     for wk in wks:
         wk_num = int(re.search(r'wk-(\d)', wk).group(1))  # type: ignore
         most_current = wk_num if wk_num > most_current else most_current
     return int(most_current)
+
+
+def check_cookies_exists(args: argparse.Namespace) -> None:
+    if not os.path.exists(COOKIES_PATH):
+        template = {
+            'league_id': '',
+            'team_id': '',
+            'season': '',
+            'SWID': '',
+            'espn_s2': '',
+        }
+        try:
+            with open(COOKIES_PATH, 'w') as wf:
+                json.dump(template, wf)
+
+        except Exception as e:
+            raise SystemExit(e)
+
+
+def update_cookies(args: argparse.Namespace) -> None:
+    try:
+        with open(COOKIES_PATH, 'r+') as f:
+            cookies = json.load(f)
+            if args.league_id:
+                cookies['league_id'] = str(args.league_id)
+            if args.team_id:
+                cookies['team_id'] = str(args.team_id)
+            if args.season:
+                cookies['season'] = str(args.season)
+            if args.SWID:
+                cookies['SWID'] = str(args.SWID)
+            if args.espn_s2:
+                cookies['espn_s2'] = str(args.espn_s2)
+            f.seek(0, 0)
+            json.dump(cookies, f, indent=2)
+    except Exception as e:
+        raise SystemExit(e)
+
+
+def print_cookies() -> None:
+    try:
+        with open(COOKIES_PATH) as rf:
+            for line in rf:
+                print(line)
+    except Exception as e:
+        raise SystemExit(e)
 
 
 def parse_args() -> argparse.Namespace:
@@ -271,6 +329,26 @@ def parse_args() -> argparse.Namespace:
         type=int,
     )
     parser.add_argument(
+        '-s', '--season',
+        help='Year of season',
+        type=int,
+    )
+    parser.add_argument(
+        '-c', '--cookies',
+        help='Display your cookies',
+        action='store_true',
+    )
+    parser.add_argument(
+        '--SWID',
+        help='SWID',
+        type=str,
+    )
+    parser.add_argument(
+        '--espn-s2',
+        help='espn_s2',
+        type=str,
+    )
+    parser.add_argument(
         '-m', '--matchup',
         help='Show your matchup',
         action='store_true',
@@ -281,6 +359,11 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if args.cookies:
+        print_cookies()
+        raise SystemExit()
+    check_cookies_exists(args)
+    update_cookies(args)
     year = load_cookies(key='season')
     if not args.week:
         args.week = last_updated_week()
@@ -290,24 +373,28 @@ def main() -> int:
         args.team_id = load_cookies(key='team_id')
     if not args.pull:
         try:
-            path = pkg_resources.resource_filename(__name__, 'data/weekly_data')
+            path = pkg_resources.resource_filename(
+                __name__, 'data/weekly_data',
+            )
             with open(
                 f'''{path}/FF_{year}_'''
-                f'''{args.league_id}_{args.team_id}_wk-{args.week}.json''',
+                f'''{args.league_id}_wk-{args.week}.json''',
             ) as rf:
                 d = json.load(rf)
         except FileNotFoundError as e:
-            raise SystemExit(f'{Colors.RED}{type(e).__name__}: '
-                             f'{e}. Data must be pulled first. [ff --pull]'
-                             f'{Colors.ENDC}')
+            raise SystemExit(
+                f'{Colors.RED}{type(e).__name__}: '
+                f'{e}. Data must be pulled first. [ff --pull]'
+                f'{Colors.ENDC}',
+            )
     else:
         d = connect_FF(args.league_id, args.week)
         save_weekly_data(
             d, year, args.league_id,  # type: ignore
             args.team_id, args.week,
         )
-    myTeam = Roster()
-    myTeam.generate_roster(d, args.team_id)
+    myTeam = Roster(args.team_id)
+    myTeam.generate_roster(d)
     myTeam.decide_lineup()
     myTeam.sort_roster()
     myTeam.print_roster()
