@@ -1,5 +1,6 @@
 ### Todo
 - [ ] (_Fri 09/03/21, 15:05:43_ ) - Add owner to print_roster
+- [ ] (_Mon 09/13/21, 12:05:34_ ) - Standard deviation of all position players to determine performance color?
 ### In Progress
 ### Completed
 - [x] (_Fri 09/03/21, 14:23:51_ ) - argparse

@@ -76,7 +76,7 @@ class Roster:
                         pass
                     player = Player(
                         name, slot, slot_id, pos,
-                        starting, proj, score, status, rosterLocked
+                        starting, proj, score, status, rosterLocked,
                     )
 
                     self.roster.append(player)
@@ -154,7 +154,7 @@ class Player(Roster):
     def __init__(
         self, name: str, slot: str, slot_id: int, pos: str,
         starting: bool, proj: float, score: float, status: str,
-        rosterLocked: bool
+        rosterLocked: bool,
     ) -> None:
         self.first = name.split(' ')[0]
         self.last = name.split(' ')[1]
@@ -176,8 +176,8 @@ class Player(Roster):
         color_performance = {
             'LOW': Colors.RED,
             'MID': Colors.YELLOW,
-            'HIGH': Colors.GREEN,
-            'NAN': Colors.BWHITE
+            'HIGH': Colors.BGREEN,
+            'NAN': Colors.BWHITE,
         }
         color_status = {
             'ACTIVE': Colors.GREEN,
@@ -191,19 +191,17 @@ class Player(Roster):
         self.color_performance = color_performance[self.performance]
 
     def performance_check(self) -> None:
-        print(f'{self.rosterLocked=}')
+        dev = (self.proj * .2)
         if self.rosterLocked:
-            print(f'{self.score=}')
-            print(f'{self.proj=}')
-            if self.score < self.proj:
+            if self.score <= (self.proj - dev):
                 self.performance = 'LOW'
-            elif self.score == self.proj:
+            elif (self.proj - dev) < self.score <= (self.proj + dev):
                 self.performance = 'MID'
-            elif self.score > self.proj:
+            elif self.score > (self.proj + dev):
                 self.performance = 'HIGH'
             else:
                 self.performance = 'NAN'
-        print(f'{self.performance=}')
+
     def __str__(self) -> str:
         self.apply_color()
         return f'{self.color_starting}' \
@@ -217,8 +215,9 @@ class Player(Roster):
                f'({self.proj})' \
                f'{Colors.ENDC}\t' \
                f'{self.color_performance}' \
-               f'{self.score :>5}' \
+               f'{self.score :>8}' \
                f'{Colors.ENDC}'.expandtabs(tabsize=16)
+
 
 def load_cookies(key: str = None) -> int | dict:
     try:
