@@ -15,7 +15,7 @@ COOKIES_PATH = pkg_resources.resource_filename(
 )
 WEEKLY_DATA_PATH = pkg_resources.resource_filename(
     __name__,
-    'data/weekly_data',
+    'data/',
 )
 
 slotID = {
@@ -143,15 +143,35 @@ class Roster:
                 except IndexError:
                     print(f'Skipping {pos}')
 
-    def get_matchup_and_totals(self, d: dict, wk: int) -> None:
+    def get_matchup_and_livescore(self, d: dict, wk: int) -> None:
         for matchup in d['schedule']:
             if matchup['matchupPeriodId'] == wk:
                 if matchup['away']['teamId'] == self.TID:
-                    self.total_score = matchup['away']['totalPointsLive']
-                    self.op_TID = matchup['home']['teamId']
+                    if 'totalPointsLive' in matchup['away']:
+                        self.total_score = matchup['away']['totalPointsLive']
+                        self.op_TID = matchup['home']['teamId']
+                    else:
+                        self.total_score = matchup['away']['totalPoints']
+                        self.op_TID = matchup['home']['teamId']
                 elif matchup['home']['teamId'] == self.TID:
-                    self.total_score = matchup['home']['totalPointsLive']
-                    self.op_TID = matchup['away']['teamId']
+                    if 'totalPointsLive' in matchup['away']:
+                        self.total_score = matchup['home']['totalPointsLive']
+                        self.op_TID = matchup['away']['teamId']
+                    else:
+                        self.total_score = matchup['home']['totalPoints']
+                        self.op_TID = matchup['away']['teamId']
+
+    def get_total_projected(self) -> None:
+        self.total_projected = 0.0
+        for p in self.roster:
+            if p.starting:
+                self.total_projected += p.proj
+
+    def get_in_play(self) -> None:
+        self.in_play = 0
+        for p in self.roster:
+            if not p.rosterLocked:
+                self.in_play += 1
 
     def print_roster(self) -> None:
         header = ('{}{:>9}{:>13}{:>10}').format(
@@ -197,11 +217,16 @@ class Player(Roster):
             'QUESTIONABLE': Colors.YELLOW,
             'OUT': Colors.RED,
             'IR': Colors.RED,
+            'SUSPENSION': Colors.RED,
         }
         self.color_starting = color_starting[self.starting]
         self.color_status = color_status[self.status]
         self.color_shouldStart = color_shouldStart[self.shouldStart]
         self.color_performance = color_performance[self.performance]
+
+    def truncate(self) -> None:
+        if len(self.last) >= 12:
+            self.last = f'{self.last[:8]}...'
 
     def performance_check(self) -> None:
         dev = (self.proj * .25)
@@ -217,6 +242,7 @@ class Player(Roster):
 
     def __str__(self) -> str:
         self.apply_color()
+        self.truncate()
         return f'{self.color_starting}' \
                f'{self.slot}' \
                f'{Colors.ENDC}:\t' \
@@ -249,10 +275,10 @@ def load_cookies(key: str = None) -> int | dict:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
-def save_weekly_data(d: dict, year: int, LID: int, TID: int, wk: int) -> None:
+def save_data(d: dict, year: int, LID: int) -> None:
     try:
         with open(
-            f'{WEEKLY_DATA_PATH}/FF_{year}_{LID}_wk-{wk}.json',
+            f'{WEEKLY_DATA_PATH}/FF_{year}_{LID}.json',
             'w',
         ) as wf:
             json.dump(d, wf)
@@ -270,13 +296,16 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
     for i in range(len(myTeam.roster)):
         print(str(myTeam.roster[i]) + spacer + str(opTeam.roster[i]))
     print(('-'*36) + spacer + ('-'*36))
-    score_len1 = len(str(myTeam.total_score))
-    score_len2 = len(str(opTeam.total_score))
-    score_spacer1 = ' ' * (36 - score_len1)
-    score_spacer2 = ' ' * (36 - score_len2)
+    in_play1 = f'Yet to Play: {myTeam.in_play}'
+    in_play2 = f'Yet to Play: {opTeam.in_play}'
+    projected1 = f'{round(myTeam.total_projected, 1):>12}'
+    projected2 = f'{round(opTeam.total_projected, 1):>12}'
+    total1 = f'{round(myTeam.total_score, 1):>10}'
+    total2 = f'{round(opTeam.total_score, 1):>10}'
     print(
-        score_spacer1 + str(myTeam.total_score) +
-        spacer + score_spacer2 + str(opTeam.total_score),
+        in_play1 + projected1 + total1 +
+        spacer +
+        in_play2 + projected2 + total2,
     )
 
 
@@ -433,11 +462,11 @@ def main() -> int:
     if not args.pull:
         try:
             path = pkg_resources.resource_filename(
-                __name__, 'data/weekly_data',
+                __name__, 'data',
             )
             with open(
                 f'''{path}/FF_{year}_'''
-                f'''{args.league_id}_wk-{args.week}.json''',
+                f'''{args.league_id}.json''',
             ) as rf:
                 d = json.load(rf)
         except FileNotFoundError as e:
@@ -448,20 +477,23 @@ def main() -> int:
             )
     else:
         d = connect_FF(args.league_id, args.week)
-        save_weekly_data(
+        save_data(
             d, year, args.league_id,  # type: ignore
-            args.team_id, args.week,
         )
 
     myTeam = Roster(args.team_id)
     myTeam.generate_roster(d)
-    myTeam.get_matchup_and_totals(d, args.week)
+    myTeam.get_matchup_and_livescore(d, args.week)
+    myTeam.get_total_projected()
+    myTeam.get_in_play()
     myTeam.decide_lineup()
     myTeam.sort_roster()
     if args.matchup:
         opTeam = Roster(myTeam.op_TID)
         opTeam.generate_roster(d)
-        opTeam.get_matchup_and_totals(d, args.week)
+        opTeam.get_matchup_and_livescore(d, args.week)
+        opTeam.get_total_projected()
+        opTeam.get_in_play()
         opTeam.decide_lineup()
         opTeam.sort_roster()
         print_matchup(myTeam, opTeam)
