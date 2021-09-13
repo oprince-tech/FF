@@ -33,13 +33,16 @@ positionID = {
 class Colors:
     BLACK = '\033[90m'
     RED = '\033[91m'
-    GREEN = '\033[32m'
-    BGREEN = '\033[92m'
     YELLOW = '\033[93m'
+    GREEN = '\033[32m'
+    LGREEN = '\033[92m'
+    BRED = '\033[97;41m'
+    BYELLOW = '\033[97;93m'
+    BGREEN = '\033[97;42m'
     BLUE = '\033[94m'
     MAGENTA = '\033[95m'
     CYAN = '\033[96m'
-    BWHITE = '\033[97m'
+    LWHITE = '\033[97m'
     ENDC = '\033[0m'
 
 
@@ -140,12 +143,22 @@ class Roster:
                 except IndexError:
                     print(f'Skipping {pos}')
 
+    def get_matchup_and_totals(self, d: dict, wk: int) -> None:
+        for matchup in d['schedule']:
+            if matchup['matchupPeriodId'] == wk:
+                if matchup['away']['teamId'] == self.TID:
+                    self.total_score = matchup['away']['totalPointsLive']
+                    self.op_TID = matchup['home']['teamId']
+                elif matchup['home']['teamId'] == self.TID:
+                    self.total_score = matchup['home']['totalPointsLive']
+                    self.op_TID = matchup['away']['teamId']
+
     def print_roster(self) -> None:
-        header = ('\n{}{:>12}{:>18}{:>12}').format(
+        header = ('{}{:>9}{:>13}{:>10}').format(
             'Slot', 'Player', 'Proj', 'Score',
         )
         print(header)
-        print('----------------------------------------------')
+        print('-'*36)
         for p in self.roster:
             print(p)
 
@@ -175,9 +188,9 @@ class Player(Roster):
         color_shouldStart = {True: Colors.CYAN, False: Colors.BLACK}
         color_performance = {
             'LOW': Colors.RED,
-            'MID': Colors.YELLOW,
-            'HIGH': Colors.BGREEN,
-            'NAN': Colors.BWHITE,
+            'MID': Colors.BLUE,
+            'HIGH': Colors.LGREEN,
+            'NAN': Colors.LWHITE,
         }
         color_status = {
             'ACTIVE': Colors.GREEN,
@@ -191,7 +204,7 @@ class Player(Roster):
         self.color_performance = color_performance[self.performance]
 
     def performance_check(self) -> None:
-        dev = (self.proj * .2)
+        dev = (self.proj * .25)
         if self.rosterLocked:
             if self.score <= (self.proj - dev):
                 self.performance = 'LOW'
@@ -207,7 +220,7 @@ class Player(Roster):
         return f'{self.color_starting}' \
                f'{self.slot}' \
                f'{Colors.ENDC}:\t' \
-               f'{self.color_status :<8}' \
+               f'{self.color_status :<4}' \
                f'{self.first[0]}. ' \
                f'{self.last}' \
                f'{Colors.ENDC}\t' \
@@ -215,8 +228,8 @@ class Player(Roster):
                f'({self.proj})' \
                f'{Colors.ENDC}\t' \
                f'{self.color_performance}' \
-               f'{self.score :>8}' \
-               f'{Colors.ENDC}'.expandtabs(tabsize=16)
+               f'{self.score :>7}' \
+               f'{Colors.ENDC}'.expandtabs(tabsize=8)
 
 
 def load_cookies(key: str = None) -> int | dict:
@@ -245,6 +258,26 @@ def save_weekly_data(d: dict, year: int, LID: int, TID: int, wk: int) -> None:
             json.dump(d, wf)
     except FileNotFoundError as e:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
+
+
+def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
+    header = ('{}{:>9}{:>13}{:>10}').format(
+        'Slot', 'Player', 'Proj', 'Score',
+    )
+    spacer = '  ||  '
+    print(header + spacer + header)
+    print(('-'*36) + spacer + ('-'*36))
+    for i in range(len(myTeam.roster)):
+        print(str(myTeam.roster[i]) + spacer + str(opTeam.roster[i]))
+    print(('-'*36) + spacer + ('-'*36))
+    score_len1 = len(str(myTeam.total_score))
+    score_len2 = len(str(opTeam.total_score))
+    score_spacer1 = ' ' * (36 - score_len1)
+    score_spacer2 = ' ' * (36 - score_len2)
+    print(
+        score_spacer1 + str(myTeam.total_score) +
+        spacer + score_spacer2 + str(opTeam.total_score),
+    )
 
 
 def connect_FF(LID: int, wk: int) -> dict:
@@ -419,11 +452,21 @@ def main() -> int:
             d, year, args.league_id,  # type: ignore
             args.team_id, args.week,
         )
+
     myTeam = Roster(args.team_id)
     myTeam.generate_roster(d)
+    myTeam.get_matchup_and_totals(d, args.week)
     myTeam.decide_lineup()
     myTeam.sort_roster()
-    myTeam.print_roster()
+    if args.matchup:
+        opTeam = Roster(myTeam.op_TID)
+        opTeam.generate_roster(d)
+        opTeam.get_matchup_and_totals(d, args.week)
+        opTeam.decide_lineup()
+        opTeam.sort_roster()
+        print_matchup(myTeam, opTeam)
+    else:
+        myTeam.print_roster()
 
     return 0
 
