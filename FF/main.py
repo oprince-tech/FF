@@ -4,16 +4,21 @@ import argparse
 import json
 import operator
 import os
-import re
 
 import pkg_resources  # type: ignore
 import requests  # type: ignore
 
 COOKIES_PATH = pkg_resources.resource_filename(
     __name__,
+    'data/cookies.json',
+)
+
+COOKIES_DEV_PATH = pkg_resources.resource_filename(
+    __name__,
     'data/cookies-dev.json',
 )
-WEEKLY_DATA_PATH = pkg_resources.resource_filename(
+
+DATA_PATH = pkg_resources.resource_filename(
     __name__,
     'data/',
 )
@@ -84,6 +89,12 @@ class Roster:
 
                     self.roster.append(player)
 
+        if len(self.roster) == 0:
+            raise SystemExit(
+                f'{Colors.RED}Team id: {self.TID} does not exist'
+                f'{Colors.ENDC}',
+            )
+
     def sort_roster(self) -> None:
         self.roster.sort(key=operator.attrgetter('slot_id'))
 
@@ -143,23 +154,34 @@ class Roster:
                 except IndexError:
                     print(f'Skipping {pos}')
 
-    def get_matchup_and_livescore(self, d: dict, wk: int) -> None:
+    def get_matchup_score(self, d: dict, wk: int) -> None:
         for matchup in d['schedule']:
             if matchup['matchupPeriodId'] == wk:
                 if matchup['away']['teamId'] == self.TID:
+                    self.op_TID = matchup['home']['teamId']
+                    self.winner = None
+                    if matchup['winner'] == 'AWAY':
+                        self.winner = True
+                    elif matchup['winner'] == 'HOME':
+                        self.winner = False
+
                     if 'totalPointsLive' in matchup['away']:
                         self.total_score = matchup['away']['totalPointsLive']
-                        self.op_TID = matchup['home']['teamId']
                     else:
                         self.total_score = matchup['away']['totalPoints']
-                        self.op_TID = matchup['home']['teamId']
+
                 elif matchup['home']['teamId'] == self.TID:
+                    self.op_TID = matchup['away']['teamId']
+                    self.winner = None
+                    if matchup['winner'] == 'HOME':
+                        self.winner = True
+                    elif matchup['winner'] == 'AWAY':
+                        self.winner = False
+
                     if 'totalPointsLive' in matchup['away']:
                         self.total_score = matchup['home']['totalPointsLive']
-                        self.op_TID = matchup['away']['teamId']
                     else:
                         self.total_score = matchup['home']['totalPoints']
-                        self.op_TID = matchup['away']['teamId']
 
     def get_total_projected(self) -> None:
         self.total_projected = 0.0
@@ -209,14 +231,14 @@ class Player(Roster):
         color_performance = {
             'LOW': Colors.RED,
             'MID': Colors.BLUE,
-            'HIGH': Colors.LGREEN,
+            'HIGH': Colors.GREEN,
             'NAN': Colors.LWHITE,
         }
         color_status = {
             'ACTIVE': Colors.GREEN,
             'QUESTIONABLE': Colors.YELLOW,
             'OUT': Colors.RED,
-            'IR': Colors.RED,
+            'INJURY_RESERVE': Colors.RED,
             'SUSPENSION': Colors.RED,
         }
         self.color_starting = color_starting[self.starting]
@@ -226,7 +248,7 @@ class Player(Roster):
 
     def truncate(self) -> None:
         if len(self.last) >= 12:
-            self.last = f'{self.last[:8]}...'
+            self.last = f'{self.last[:7]}...'
 
     def performance_check(self) -> None:
         dev = (self.proj * .25)
@@ -249,7 +271,7 @@ class Player(Roster):
                f'{self.color_status :<4}' \
                f'{self.first[0]}. ' \
                f'{self.last}' \
-               f'{Colors.ENDC}\t' \
+               f'{Colors.ENDC:>5}\t' \
                f'{self.color_shouldStart}' \
                f'({self.proj})' \
                f'{Colors.ENDC}\t' \
@@ -258,10 +280,14 @@ class Player(Roster):
                f'{Colors.ENDC}'.expandtabs(tabsize=8)
 
 
-def load_cookies(key: str = None) -> int | dict:
+def load_cookies(dev: bool, key: str = None) -> int | dict:
     try:
-        with open(COOKIES_PATH) as rc:
-            c = json.load(rc)
+        if dev:
+            with open(COOKIES_DEV_PATH) as rc:
+                c = json.load(rc)
+        else:
+            with open(COOKIES_PATH) as rc:
+                c = json.load(rc)
         return int(c[key]) if key else c
     except ValueError as e:
         print_cookies()
@@ -278,10 +304,11 @@ def load_cookies(key: str = None) -> int | dict:
 def save_data(d: dict, year: int, LID: int) -> None:
     try:
         with open(
-            f'{WEEKLY_DATA_PATH}/FF_{year}_{LID}.json',
+            f'{DATA_PATH}/FF_{year}_{LID}.json',
             'w',
         ) as wf:
             json.dump(d, wf)
+        print('Saving data...')
     except FileNotFoundError as e:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
@@ -290,27 +317,36 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
     header = ('{}{:>9}{:>13}{:>10}').format(
         'Slot', 'Player', 'Proj', 'Score',
     )
-    spacer = '  ||  '
-    print(header + spacer + header)
-    print(('-'*36) + spacer + ('-'*36))
+    if myTeam.winner is True:
+        sp = f'  {Colors.BGREEN} {Colors.ENDC}{Colors.BRED} {Colors.ENDC}  '
+        t1 = f'{Colors.GREEN}{round(myTeam.total_score, 1):>10}{Colors.ENDC}'
+        t2 = f'{Colors.RED}{round(opTeam.total_score, 1):>10}{Colors.ENDC}'
+    elif myTeam.winner is False:
+        sp = f'  {Colors.BRED} {Colors.ENDC}{Colors.BGREEN} {Colors.ENDC}  '
+        t1 = f'{Colors.RED}{round(myTeam.total_score, 1):>10}{Colors.ENDC}'
+        t2 = f'{Colors.GREEN}{round(opTeam.total_score, 1):>10}{Colors.ENDC}'
+    else:
+        sp = '      '
+        t1 = f'{round(myTeam.total_score, 1):>10}'
+        t2 = f'{round(opTeam.total_score, 1):>10}'
+    print(header + sp + header)
+    print(('-'*36) + sp + ('-'*36))
     for i in range(len(myTeam.roster)):
-        print(str(myTeam.roster[i]) + spacer + str(opTeam.roster[i]))
-    print(('-'*36) + spacer + ('-'*36))
+        print(str(myTeam.roster[i]) + sp + str(opTeam.roster[i]))
+    print(('-'*36) + sp + ('-'*36))
     in_play1 = f'Yet to Play: {myTeam.in_play}'
     in_play2 = f'Yet to Play: {opTeam.in_play}'
     projected1 = f'{round(myTeam.total_projected, 1):>12}'
     projected2 = f'{round(opTeam.total_projected, 1):>12}'
-    total1 = f'{round(myTeam.total_score, 1):>10}'
-    total2 = f'{round(opTeam.total_score, 1):>10}'
     print(
-        in_play1 + projected1 + total1 +
-        spacer +
-        in_play2 + projected2 + total2,
+        in_play1 + projected1 + t1 +
+        sp +
+        in_play2 + projected2 + t2,
     )
 
 
-def connect_FF(LID: int, wk: int) -> dict:
-    c = load_cookies()
+def connect_FF(LID: int, wk: int, dev: bool) -> dict:
+    c = load_cookies(dev)
     year = c['season']  # type: ignore
     swid = c['SWID']  # type: ignore
     espn_s2 = c['espn_s2']  # type: ignore
@@ -332,22 +368,6 @@ def connect_FF(LID: int, wk: int) -> dict:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
-def last_updated_week() -> int:
-    try:
-        wks = os.listdir(WEEKLY_DATA_PATH)
-    except FileNotFoundError as e:
-        raise SystemExit(
-            f'{Colors.RED}{type(e).__name__}: '
-            f'{e}. Data must be pulled first. [ff --pull]'
-            f'{Colors.ENDC}',
-        )
-    most_current = 0
-    for wk in wks:
-        wk_num = int(re.search(r'wk-(\d)', wk).group(1))  # type: ignore
-        most_current = wk_num if wk_num > most_current else most_current
-    return int(most_current)
-
-
 def check_cookies_exists(args: argparse.Namespace) -> None:
     if not os.path.exists(COOKIES_PATH):
         template = {
@@ -366,8 +386,12 @@ def check_cookies_exists(args: argparse.Namespace) -> None:
 
 
 def update_cookies(args: argparse.Namespace) -> None:
+    if args.dev:
+        path = COOKIES_DEV_PATH
+    else:
+        path = COOKIES_PATH
     try:
-        with open(COOKIES_PATH, 'r+') as f:
+        with open(path, 'r+') as f:
             cookies = json.load(f)
             if args.league_id:
                 cookies['league_id'] = str(args.league_id)
@@ -441,6 +465,11 @@ def parse_args() -> argparse.Namespace:
         help='Show your matchup',
         action='store_true',
     )
+    parser.add_argument(
+        '-d', '--dev',
+        help='Use dev cookies',
+        action='store_true',
+    )
     args = parser.parse_args()
     return args
 
@@ -452,13 +481,13 @@ def main() -> int:
         raise SystemExit()
     check_cookies_exists(args)
     update_cookies(args)
-    year = load_cookies(key='season')
+    year = load_cookies(args.dev, key='season')
     if not args.week:
-        args.week = last_updated_week()
+        args.week = load_cookies(args.dev, key='week')
     if not args.league_id:
-        args.league_id = load_cookies(key='league_id')
+        args.league_id = load_cookies(args.dev, key='league_id')
     if not args.team_id:
-        args.team_id = load_cookies(key='team_id')
+        args.team_id = load_cookies(args.dev, key='team_id')
     if not args.pull:
         try:
             path = pkg_resources.resource_filename(
@@ -476,14 +505,14 @@ def main() -> int:
                 f'{Colors.ENDC}',
             )
     else:
-        d = connect_FF(args.league_id, args.week)
+        d = connect_FF(args.league_id, args.week, args.dev)
         save_data(
             d, year, args.league_id,  # type: ignore
         )
 
     myTeam = Roster(args.team_id)
     myTeam.generate_roster(d)
-    myTeam.get_matchup_and_livescore(d, args.week)
+    myTeam.get_matchup_score(d, args.week)
     myTeam.get_total_projected()
     myTeam.get_in_play()
     myTeam.decide_lineup()
@@ -491,7 +520,7 @@ def main() -> int:
     if args.matchup:
         opTeam = Roster(myTeam.op_TID)
         opTeam.generate_roster(d)
-        opTeam.get_matchup_and_livescore(d, args.week)
+        opTeam.get_matchup_score(d, args.week)
         opTeam.get_total_projected()
         opTeam.get_in_play()
         opTeam.decide_lineup()
