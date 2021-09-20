@@ -5,3 +5,4 @@ weekly_data/*
 __pycache__
 FF.egg-info
 FF_20*
+.python-version

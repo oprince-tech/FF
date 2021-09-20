@@ -1,6 +1,7 @@
 ### Todo
 - [ ] (_Fri 09/03/21, 15:05:43_ ) - Add owner to print_roster
 - [ ] (_Mon 09/13/21, 12:05:34_ ) - Standard deviation of all position players to determine performance color?
+- [ ] - Add player score from matchup to prevent previous weeks score
 
 ### In Progress
 ### Completed
