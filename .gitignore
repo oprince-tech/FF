@@ -6,3 +6,4 @@ __pycache__
 FF.egg-info
 FF_20*
 .python-version
+.eggs

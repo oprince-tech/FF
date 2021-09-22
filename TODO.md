@@ -15,3 +15,4 @@
 - [x] (_Mon 09/13/21, 17:03:35_ ) - In play / Yet to play
 - [x] (_Mon 09/13/21, 13:44:34_ ) - Ellipses for long names
 - [x] (_Tue 09/14/21, 11:45:18_ ) - Winner indication
+- [x] - re-implement separate week json files to keep earlier weeks data

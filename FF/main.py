@@ -56,7 +56,7 @@ class Roster:
         self.roster: list[Player] = []
         self.TID = TID
 
-    def generate_roster(self, d: dict) -> None:
+    def generate_roster(self, d: dict, week: int) -> None:
         print('\nAdding players to roster...')
         for team in d['teams']:
             if team['id'] == self.TID:
@@ -71,10 +71,11 @@ class Roster:
                     ]
                     proj, score = 0, 0
                     for stat in p['playerPoolEntry']['player']['stats']:
-                        if stat['statSourceId'] == 0:
-                            score = stat['appliedTotal']
-                        elif stat['statSourceId'] == 1:
-                            proj = stat['appliedTotal']
+                        if stat['scoringPeriodId'] == week:
+                            if stat['statSourceId'] == 0:
+                                score = stat['appliedTotal']
+                            elif stat['statSourceId'] == 1:
+                                proj = stat['appliedTotal']
 
                     status = 'ACTIVE'
                     rosterLocked = p['playerPoolEntry']['rosterLocked']
@@ -238,6 +239,7 @@ class Player(Roster):
             'ACTIVE': Colors.GREEN,
             'QUESTIONABLE': Colors.YELLOW,
             'OUT': Colors.RED,
+            'DOUBTFUL': Colors.RED,
             'INJURY_RESERVE': Colors.RED,
             'SUSPENSION': Colors.RED,
         }
@@ -251,13 +253,13 @@ class Player(Roster):
             self.last = f'{self.last[:7]}...'
 
     def performance_check(self) -> None:
-        dev = (self.proj * .25)
+        spread = (self.proj * .25)
         if self.rosterLocked:
-            if self.score <= (self.proj - dev):
+            if self.score < (self.proj - spread):
                 self.performance = 'LOW'
-            elif (self.proj - dev) < self.score <= (self.proj + dev):
+            elif (self.proj - spread) < self.score <= (self.proj + spread):
                 self.performance = 'MID'
-            elif self.score > (self.proj + dev):
+            elif self.score > (self.proj + spread):
                 self.performance = 'HIGH'
             else:
                 self.performance = 'NAN'
@@ -301,10 +303,10 @@ def load_cookies(dev: bool, key: str = None) -> int | dict:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
-def save_data(d: dict, year: int, LID: int) -> None:
+def save_data(d: dict, year: int, week: int, LID: int) -> None:
     try:
         with open(
-            f'{DATA_PATH}/FF_{year}_{LID}.json',
+            f'{DATA_PATH}/FF_{year}_wk{week}_{LID}.json',
             'w',
         ) as wf:
             json.dump(d, wf)
@@ -319,25 +321,32 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
     )
     if myTeam.winner is True:
         sp = f'  {Colors.BGREEN} {Colors.ENDC}{Colors.BRED} {Colors.ENDC}  '
-        t1 = f'{Colors.GREEN}{round(myTeam.total_score, 1):>10}{Colors.ENDC}'
-        t2 = f'{Colors.RED}{round(opTeam.total_score, 1):>10}{Colors.ENDC}'
-    elif myTeam.winner is False:
+        t1 = f'{Colors.GREEN}{round(myTeam.total_score, 1):>9}{Colors.ENDC}'
+        t2 = f'{Colors.RED}{round(opTeam.total_score, 1):>9}{Colors.ENDC}'
+    elif opTeam.winner is True:
         sp = f'  {Colors.BRED} {Colors.ENDC}{Colors.BGREEN} {Colors.ENDC}  '
-        t1 = f'{Colors.RED}{round(myTeam.total_score, 1):>10}{Colors.ENDC}'
-        t2 = f'{Colors.GREEN}{round(opTeam.total_score, 1):>10}{Colors.ENDC}'
+        t1 = f'{Colors.RED}{round(myTeam.total_score, 1):>9}{Colors.ENDC}'
+        t2 = f'{Colors.GREEN}{round(opTeam.total_score, 1):>9}{Colors.ENDC}'
     else:
         sp = '      '
-        t1 = f'{round(myTeam.total_score, 1):>10}'
-        t2 = f'{round(opTeam.total_score, 1):>10}'
+        t1 = f'{round(myTeam.total_score, 1):>9}'
+        t2 = f'{round(opTeam.total_score, 1):>9}'
     print(header + sp + header)
     print(('-'*36) + sp + ('-'*36))
     for i in range(len(myTeam.roster)):
         print(str(myTeam.roster[i]) + sp + str(opTeam.roster[i]))
     print(('-'*36) + sp + ('-'*36))
+
+    my_ytp_spacer = 13
+    op_ytp_spacer = 13
+    if myTeam.in_play >= 10:
+        my_ytp_spacer -= 1
+    if opTeam.in_play >= 10:
+        op_ytp_spacer -= 1
     in_play1 = f'Yet to Play: {myTeam.in_play}'
     in_play2 = f'Yet to Play: {opTeam.in_play}'
-    projected1 = f'{round(myTeam.total_projected, 1):>12}'
-    projected2 = f'{round(opTeam.total_projected, 1):>12}'
+    projected1 = f'{round(myTeam.total_projected, 1):>{my_ytp_spacer}}'
+    projected2 = f'{round(opTeam.total_projected, 1):>{op_ytp_spacer}}'
     print(
         in_play1 + projected1 + t1 +
         sp +
@@ -399,6 +408,8 @@ def update_cookies(args: argparse.Namespace) -> None:
                 cookies['team_id'] = str(args.team_id)
             if args.season:
                 cookies['season'] = str(args.season)
+            if args.week:
+                cookies['week'] = str(args.week)
             if args.SWID:
                 cookies['SWID'] = str(args.SWID)
             if args.espn_s2:
@@ -494,7 +505,7 @@ def main() -> int:
                 __name__, 'data',
             )
             with open(
-                f'''{path}/FF_{year}_'''
+                f'''{path}/FF_{year}_wk{args.week}_'''
                 f'''{args.league_id}.json''',
             ) as rf:
                 d = json.load(rf)
@@ -507,11 +518,11 @@ def main() -> int:
     else:
         d = connect_FF(args.league_id, args.week, args.dev)
         save_data(
-            d, year, args.league_id,  # type: ignore
+            d, year, args.week, args.league_id,  # type: ignore
         )
 
     myTeam = Roster(args.team_id)
-    myTeam.generate_roster(d)
+    myTeam.generate_roster(d, args.week)
     myTeam.get_matchup_score(d, args.week)
     myTeam.get_total_projected()
     myTeam.get_in_play()
@@ -519,7 +530,7 @@ def main() -> int:
     myTeam.sort_roster()
     if args.matchup:
         opTeam = Roster(myTeam.op_TID)
-        opTeam.generate_roster(d)
+        opTeam.generate_roster(d, args.week)
         opTeam.get_matchup_score(d, args.week)
         opTeam.get_total_projected()
         opTeam.get_in_play()
