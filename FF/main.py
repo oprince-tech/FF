@@ -194,7 +194,8 @@ class Roster:
         self.in_play = 0
         for p in self.roster:
             if not p.rosterLocked:
-                self.in_play += 1
+                while self.in_play < 9:
+                    self.in_play += 1
 
     def print_roster(self) -> None:
         header = ('{}{:>9}{:>13}{:>10}').format(
@@ -337,16 +338,10 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
         print(str(myTeam.roster[i]) + sp + str(opTeam.roster[i]))
     print(('-'*36) + sp + ('-'*36))
 
-    my_ytp_spacer = 13
-    op_ytp_spacer = 13
-    if myTeam.in_play >= 10:
-        my_ytp_spacer -= 1
-    if opTeam.in_play >= 10:
-        op_ytp_spacer -= 1
     in_play1 = f'Yet to Play: {myTeam.in_play}'
     in_play2 = f'Yet to Play: {opTeam.in_play}'
-    projected1 = f'{round(myTeam.total_projected, 1):>{my_ytp_spacer}}'
-    projected2 = f'{round(opTeam.total_projected, 1):>{op_ytp_spacer}}'
+    projected1 = f'{round(myTeam.total_projected, 1):>13}'
+    projected2 = f'{round(opTeam.total_projected, 1):>13}'
     print(
         in_play1 + projected1 + t1 +
         sp +
