@@ -3,6 +3,8 @@
 - [ ] (_Mon 09/13/21, 12:05:34_ ) - Standard deviation of all position players to determine performance color?
 - [ ] - Add player score from matchup to prevent previous weeks score
 
+- [ ] (_Mon 09/27/21, 14:35:08_ ) - Lengthen D/ST team names
+- [ ] (_Mon 09/27/21, 15:18:56_ ) - Tiebreak on decide flex decided on opp def or last week score or carries/YPC
 ### In Progress
 ### Completed
 - [x] (_Fri 09/03/21, 14:23:51_ ) - argparse

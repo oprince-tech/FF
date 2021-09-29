@@ -26,7 +26,7 @@ DATA_PATH = pkg_resources.resource_filename(
 slotID = {
     0: 'QB', 2: 'RB', 4: 'WR',
     6: 'TE', 16: 'DST', 17: 'K',
-    20: 'Bench', 21: 'IR', 23: 'FLEX',
+    20: 'B', 21: 'IR', 23: 'FLX',
 }
 
 positionID = {
@@ -64,7 +64,9 @@ class Roster:
                     name = p['playerPoolEntry']['player']['fullName']
                     slot = slotID[p['lineupSlotId']]
                     slot_id = p['lineupSlotId']
-                    starting = False if slot == 'Bench' else True
+                    if slot_id == 23:
+                        slot_id = 7
+                    starting = False if slot == 'B' else True
                     pos = positionID[
                         p['playerPoolEntry']
                         ['player']['defaultPositionId']
@@ -96,7 +98,7 @@ class Roster:
                 f'{Colors.ENDC}',
             )
 
-    def sort_roster(self) -> None:
+    def sort_roster_by_pos(self) -> None:
         self.roster.sort(key=operator.attrgetter('slot_id'))
 
     def decide_flex(self) -> Player:
@@ -104,27 +106,22 @@ class Roster:
         flex_ok = ['RB', 'WR', 'TE']
         flex_spot: list = list(
             filter(
-                lambda x: x.pos in flex_ok and not x.starting,
+                lambda x: x.pos in flex_ok and not x.shouldStart,
                 self.roster,
             ),
         )
-        flex = flex_spot[0]
+        flex_spot.sort(key=operator.attrgetter('proj'), reverse=True)
         current_flex: list = list(
             filter(
-                lambda x: x.slot == 'FLEX',
+                lambda x: x.slot == 'FLX',
                 self.roster,
             ),
         )
 
-        if flex.proj > current_flex[0].proj:
-            flex.shouldStart = True
-            current_flex[0].shouldStart = False
-        else:
-            flex.shouldStart = False
-            current_flex[0].shouldStart = True
-            flex = current_flex[0]
+        flex = flex_spot[0]
+        current_flex[0].shouldStart = False
+        flex.shouldStart = True
 
-        flex.slot_id = 15
         return flex
 
     def decide_lineup(self) -> None:
@@ -136,15 +133,19 @@ class Roster:
         }
 
         for pos, num in position_spots.items():
-            position_players = list(
+            position_players: list = list(
                 filter(
                     lambda x: x.pos == pos,
                     self.roster,
                 ),
             )
+            position_players.sort(
+                key=operator.attrgetter('proj'), reverse=True,
+            )
 
             if pos == 'FLEX':
                 flex = self.decide_flex()
+                flex.shouldStart = True
                 position_players.append(flex)
                 continue
 
@@ -198,8 +199,8 @@ class Roster:
                     self.in_play += 1
 
     def print_roster(self) -> None:
-        header = ('{}{:>9}{:>13}{:>10}').format(
-            'Slot', 'Player', 'Proj', 'Score',
+        header = ('{}{}{:>9}{:>13}{:>10}').format(
+            'Slot', 'Pos', 'Player', 'Proj', 'Score',
         )
         print(header)
         print('-'*36)
@@ -269,18 +270,19 @@ class Player(Roster):
         self.apply_color()
         self.truncate()
         return f'{self.color_starting}' \
-               f'{self.slot}' \
-               f'{Colors.ENDC}:\t' \
-               f'{self.color_status :<4}' \
+               f'{self.slot}:' \
+               f'{Colors.ENDC:<5}\t' \
+               f'{self.pos:<4}' \
+               f'{self.color_status:<4}' \
                f'{self.first[0]}. ' \
-               f'{self.last}' \
-               f'{Colors.ENDC:>5}\t' \
+               f'{self.last:<8}' \
+               f'{Colors.ENDC}\t' \
                f'{self.color_shouldStart}' \
-               f'({self.proj})' \
+               f'{self.proj:>5}' \
                f'{Colors.ENDC}\t' \
                f'{self.color_performance}' \
-               f'{self.score :>7}' \
-               f'{Colors.ENDC}'.expandtabs(tabsize=8)
+               f'{self.score :>6}' \
+               f'{Colors.ENDC}'.expandtabs(3)
 
 
 def load_cookies(dev: bool, key: str = None) -> int | dict:
@@ -317,21 +319,21 @@ def save_data(d: dict, year: int, week: int, LID: int) -> None:
 
 
 def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
-    header = ('{}{:>9}{:>13}{:>10}').format(
-        'Slot', 'Player', 'Proj', 'Score',
+    header = ('{:<6}{:<4}{:<15}{:<6}{}').format(
+        'Slot', 'Pos', 'Player', 'Proj', 'Score',
     )
     if myTeam.winner is True:
         sp = f'  {Colors.BGREEN} {Colors.ENDC}{Colors.BRED} {Colors.ENDC}  '
-        t1 = f'{Colors.GREEN}{round(myTeam.total_score, 1):>9}{Colors.ENDC}'
-        t2 = f'{Colors.RED}{round(opTeam.total_score, 1):>9}{Colors.ENDC}'
+        t1 = f'{Colors.GREEN}{round(myTeam.total_score, 1):>7}{Colors.ENDC}'
+        t2 = f'{Colors.RED}{round(opTeam.total_score, 1):>7}{Colors.ENDC}'
     elif opTeam.winner is True:
         sp = f'  {Colors.BRED} {Colors.ENDC}{Colors.BGREEN} {Colors.ENDC}  '
-        t1 = f'{Colors.RED}{round(myTeam.total_score, 1):>9}{Colors.ENDC}'
-        t2 = f'{Colors.GREEN}{round(opTeam.total_score, 1):>9}{Colors.ENDC}'
+        t1 = f'{Colors.RED}{round(myTeam.total_score, 1):>7}{Colors.ENDC}'
+        t2 = f'{Colors.GREEN}{round(opTeam.total_score, 1):>7}{Colors.ENDC}'
     else:
         sp = '      '
-        t1 = f'{round(myTeam.total_score, 1):>9}'
-        t2 = f'{round(opTeam.total_score, 1):>9}'
+        t1 = f'{round(myTeam.total_score, 1):>7}'
+        t2 = f'{round(opTeam.total_score, 1):>7}'
     print(header + sp + header)
     print(('-'*36) + sp + ('-'*36))
     for i in range(len(myTeam.roster)):
@@ -340,8 +342,8 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
 
     in_play1 = f'Yet to Play: {myTeam.in_play}'
     in_play2 = f'Yet to Play: {opTeam.in_play}'
-    projected1 = f'{round(myTeam.total_projected, 1):>13}'
-    projected2 = f'{round(opTeam.total_projected, 1):>13}'
+    projected1 = f'{round(myTeam.total_projected, 1):>15}'
+    projected2 = f'{round(opTeam.total_projected, 1):>15}'
     print(
         in_play1 + projected1 + t1 +
         sp +
@@ -522,7 +524,7 @@ def main() -> int:
     myTeam.get_total_projected()
     myTeam.get_in_play()
     myTeam.decide_lineup()
-    myTeam.sort_roster()
+    myTeam.sort_roster_by_pos()
     if args.matchup:
         opTeam = Roster(myTeam.op_TID)
         opTeam.generate_roster(d, args.week)
@@ -530,7 +532,7 @@ def main() -> int:
         opTeam.get_total_projected()
         opTeam.get_in_play()
         opTeam.decide_lineup()
-        opTeam.sort_roster()
+        opTeam.sort_roster_by_pos()
         print_matchup(myTeam, opTeam)
     else:
         myTeam.print_roster()
