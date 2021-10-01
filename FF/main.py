@@ -34,6 +34,10 @@ positionID = {
     4: 'TE', 5: 'K', 16: 'DST',
 }
 
+HEADER = ('{:<6}{:<4}{:<15}{:<6}{}').format(
+    'Slot', 'Pos', 'Player', 'Proj', 'Score',
+)
+
 
 class Colors:
     BLACK = '\033[90m'
@@ -56,7 +60,7 @@ class Roster:
         self.roster: list[Player] = []
         self.TID = TID
 
-    def generate_roster(self, d: dict, week: int) -> None:
+    def generate_roster(self, d: dict, year: int, week: int) -> None:
         print('\nAdding players to roster...')
         for team in d['teams']:
             if team['id'] == self.TID:
@@ -73,6 +77,11 @@ class Roster:
                     ]
                     proj, score = 0, 0
                     for stat in p['playerPoolEntry']['player']['stats']:
+                        if (
+                            stat['externalId'] == str(year) and
+                            stat['statSourceId'] == 0
+                        ):
+                            avg = stat['appliedAverage']
                         if stat['scoringPeriodId'] == week:
                             if stat['statSourceId'] == 0:
                                 score = stat['appliedTotal']
@@ -87,7 +96,7 @@ class Roster:
                         pass
                     player = Player(
                         name, slot, slot_id, pos,
-                        starting, proj, score, status, rosterLocked,
+                        starting, proj, score, avg, status, rosterLocked,
                     )
 
                     self.roster.append(player)
@@ -101,7 +110,7 @@ class Roster:
     def sort_roster_by_pos(self) -> None:
         self.roster.sort(key=operator.attrgetter('slot_id'))
 
-    def decide_flex(self) -> Player:
+    def decide_flex(self) -> None:
         print('Deciding flex position...')
         flex_ok = ['RB', 'WR', 'TE']
         flex_spot: list = list(
@@ -111,18 +120,17 @@ class Roster:
             ),
         )
         flex_spot.sort(key=operator.attrgetter('proj'), reverse=True)
-        current_flex: list = list(
-            filter(
-                lambda x: x.slot == 'FLX',
-                self.roster,
-            ),
-        )
 
-        flex = flex_spot[0]
-        current_flex[0].shouldStart = False
+        max = flex_spot[0].proj
+        tiebreak = [p for p in flex_spot if p.proj == max]
+        
+        if len(tiebreak) >= 2:
+            tiebreak.sort(key=operator.attrgetter('avg'), reverse=True)
+            # need tiebreak for equal averages
+            flex = tiebreak[0]
+        else:
+            flex = flex_spot[0]
         flex.shouldStart = True
-
-        return flex
 
     def decide_lineup(self) -> None:
         print('Deciding best lineup...')
@@ -143,18 +151,14 @@ class Roster:
                 key=operator.attrgetter('proj'), reverse=True,
             )
 
-            if pos == 'FLEX':
-                flex = self.decide_flex()
-                flex.shouldStart = True
-                position_players.append(flex)
-                continue
-
             for i in range(num):
                 try:
                     p = position_players[i]
                     p.shouldStart = True
                 except IndexError:
                     print(f'Skipping {pos}')
+            if pos == 'FLEX':
+                self.decide_flex()
 
     def get_matchup_score(self, d: dict, wk: int) -> None:
         for matchup in d['schedule']:
@@ -199,10 +203,7 @@ class Roster:
                     self.in_play += 1
 
     def print_roster(self) -> None:
-        header = ('{}{}{:>9}{:>13}{:>10}').format(
-            'Slot', 'Pos', 'Player', 'Proj', 'Score',
-        )
-        print(header)
+        print(HEADER)
         print('-'*36)
         for p in self.roster:
             print(p)
@@ -211,7 +212,7 @@ class Roster:
 class Player(Roster):
     def __init__(
         self, name: str, slot: str, slot_id: int, pos: str,
-        starting: bool, proj: float, score: float, status: str,
+        starting: bool, proj: float, score: float, avg: float, status: str,
         rosterLocked: bool,
     ) -> None:
         self.first = name.split(' ')[0]
@@ -223,6 +224,7 @@ class Player(Roster):
         self.shouldStart = False
         self.proj = round(proj, 1)
         self.score = round(score, 1)
+        self.avg = round(avg, 1)
         self.status = status
         self.rosterLocked = rosterLocked
         self.performance = 'NAN'
@@ -319,9 +321,6 @@ def save_data(d: dict, year: int, week: int, LID: int) -> None:
 
 
 def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
-    header = ('{:<6}{:<4}{:<15}{:<6}{}').format(
-        'Slot', 'Pos', 'Player', 'Proj', 'Score',
-    )
     if myTeam.winner is True:
         sp = f'  {Colors.BGREEN} {Colors.ENDC}{Colors.BRED} {Colors.ENDC}  '
         t1 = f'{Colors.GREEN}{round(myTeam.total_score, 1):>7}{Colors.ENDC}'
@@ -334,7 +333,7 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
         sp = '      '
         t1 = f'{round(myTeam.total_score, 1):>7}'
         t2 = f'{round(opTeam.total_score, 1):>7}'
-    print(header + sp + header)
+    print(HEADER + sp + HEADER)
     print(('-'*36) + sp + ('-'*36))
     for i in range(len(myTeam.roster)):
         print(str(myTeam.roster[i]) + sp + str(opTeam.roster[i]))
@@ -360,7 +359,10 @@ def connect_FF(LID: int, wk: int, dev: bool) -> dict:
     url = (
         f'https://fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/'
         f'segments/0/leagues/{LID}?view=mMatchup&view=mMatchupScore'
+        '&view=mPositionalRatings'
     )
+    # Def ratings against position
+    # https://fantasy.espn.com/apis/v3/games/ffl/seasons/2021/segments/0/leagues/131034?view=kona_player_info
 
     try:
         r = requests.get(
@@ -377,9 +379,9 @@ def connect_FF(LID: int, wk: int, dev: bool) -> dict:
 def check_cookies_exists(args: argparse.Namespace) -> None:
     if not os.path.exists(COOKIES_PATH):
         template = {
-            'league_id': '',
-            'team_id': '',
-            'season': '',
+            'league_id': 0,
+            'team_id': 0,
+            'season': 0,
             'SWID': '',
             'espn_s2': '',
         }
@@ -400,19 +402,20 @@ def update_cookies(args: argparse.Namespace) -> None:
         with open(path, 'r+') as f:
             cookies = json.load(f)
             if args.league_id:
-                cookies['league_id'] = str(args.league_id)
+                cookies['league_id'] = args.league_id
             if args.team_id:
-                cookies['team_id'] = str(args.team_id)
+                cookies['team_id'] = args.team_id
             if args.season:
-                cookies['season'] = str(args.season)
+                cookies['season'] = args.season
             if args.week:
-                cookies['week'] = str(args.week)
+                cookies['week'] = args.week
             if args.SWID:
-                cookies['SWID'] = str(args.SWID)
+                cookies['SWID'] = args.SWID
             if args.espn_s2:
-                cookies['espn_s2'] = str(args.espn_s2)
+                cookies['espn_s2'] = args.espn_s2
             f.seek(0, 0)
             json.dump(cookies, f, indent=2)
+            f.truncate()
     except Exception as e:
         raise SystemExit(e)
 
@@ -489,13 +492,15 @@ def main() -> int:
         raise SystemExit()
     check_cookies_exists(args)
     update_cookies(args)
-    year = load_cookies(args.dev, key='season')
+    year = int(load_cookies(args.dev, key='season'))  # type: ignore
     if not args.week:
-        args.week = load_cookies(args.dev, key='week')
+        args.week = load_cookies(args.dev, key='week')  # type: ignore
     if not args.league_id:
-        args.league_id = load_cookies(args.dev, key='league_id')
+        args.league_id = load_cookies(
+            args.dev, key='league_id',
+        )  # type: ignore
     if not args.team_id:
-        args.team_id = load_cookies(args.dev, key='team_id')
+        args.team_id = load_cookies(args.dev, key='team_id')  # type: ignore
     if not args.pull:
         try:
             path = pkg_resources.resource_filename(
@@ -515,11 +520,11 @@ def main() -> int:
     else:
         d = connect_FF(args.league_id, args.week, args.dev)
         save_data(
-            d, year, args.week, args.league_id,  # type: ignore
+            d, year, args.week, args.league_id,
         )
 
     myTeam = Roster(args.team_id)
-    myTeam.generate_roster(d, args.week)
+    myTeam.generate_roster(d, year, args.week)
     myTeam.get_matchup_score(d, args.week)
     myTeam.get_total_projected()
     myTeam.get_in_play()
@@ -527,7 +532,7 @@ def main() -> int:
     myTeam.sort_roster_by_pos()
     if args.matchup:
         opTeam = Roster(myTeam.op_TID)
-        opTeam.generate_roster(d, args.week)
+        opTeam.generate_roster(d, year, args.week)
         opTeam.get_matchup_score(d, args.week)
         opTeam.get_total_projected()
         opTeam.get_in_play()
