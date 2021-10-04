@@ -123,7 +123,7 @@ class Roster:
 
         max = flex_spot[0].proj
         tiebreak = [p for p in flex_spot if p.proj == max]
-        
+
         if len(tiebreak) >= 2:
             tiebreak.sort(key=operator.attrgetter('avg'), reverse=True)
             # need tiebreak for equal averages
@@ -296,16 +296,24 @@ def load_cookies(dev: bool, key: str = None) -> int | dict:
             with open(COOKIES_PATH) as rc:
                 c = json.load(rc)
         return int(c[key]) if key else c
+    except KeyError as e:
+        print_cookies()
+        raise type(e)(
+            f'{Colors.RED}{type(e).__name__}: '
+            'Error loading from your cookies file. '
+            'Ensure all the fields are filled out.'
+            f'{Colors.ENDC}',
+        )
     except ValueError as e:
         print_cookies()
-        raise SystemExit(
+        raise type(e)(
             f'{Colors.RED}{type(e).__name__}: '
             'Error loading from your cookies file. '
             'Ensure all the fields are filled out.'
             f'{Colors.ENDC}',
         )
     except FileNotFoundError as e:
-        raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
+        raise type(e)(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
 def save_data(d: dict, year: int, week: int, LID: int) -> None:
@@ -376,28 +384,24 @@ def connect_FF(LID: int, wk: int, dev: bool) -> dict:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
-def check_cookies_exists(args: argparse.Namespace) -> None:
-    if not os.path.exists(COOKIES_PATH):
+def check_cookies_exists(path) -> None:
+    if not os.path.exists(path):
         template = {
-            'league_id': 0,
-            'team_id': 0,
-            'season': 0,
-            'SWID': '',
-            'espn_s2': '',
+            "league_id": 0,
+            "team_id": 0,
+            "season": 0,
+            "week": 0,
+            "SWID": "",
+            "espn_s2": ""
         }
         try:
-            with open(COOKIES_PATH, 'w') as wf:
+            with open(path, 'w') as wf:
                 json.dump(template, wf)
 
         except Exception as e:
             raise SystemExit(e)
 
-
-def update_cookies(args: argparse.Namespace) -> None:
-    if args.dev:
-        path = COOKIES_DEV_PATH
-    else:
-        path = COOKIES_PATH
+def update_cookies(args: argparse.Namespace, path) -> None:
     try:
         with open(path, 'r+') as f:
             cookies = json.load(f)
@@ -490,8 +494,11 @@ def main() -> int:
     if args.cookies:
         print_cookies()
         raise SystemExit()
-    check_cookies_exists(args)
-    update_cookies(args)
+    check_cookies_exists(COOKIES_PATH)
+    if args.dev:
+        update_cookies(args, COOKIES_DEV_PATH)
+    else:
+        update_cookies(args, COOKIES_PATH)
     year = int(load_cookies(args.dev, key='season'))  # type: ignore
     if not args.week:
         args.week = load_cookies(args.dev, key='week')  # type: ignore
