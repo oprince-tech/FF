@@ -327,6 +327,21 @@ def save_data(d: dict, year: int, week: int, LID: int) -> None:
     except FileNotFoundError as e:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
+def load_data(path: str, args: argparse.Namespace) -> dict:
+    try:
+        with open(
+            f'''{path}/FF_{args.season}_wk{args.week}_'''
+            f'''{args.league_id}.json''',
+        ) as rf:
+            d = json.load(rf)
+        return d
+    except FileNotFoundError as e:
+        raise SystemExit(
+            f'{Colors.RED}{type(e).__name__}: '
+            f'{e}. Data must be pulled first. [ff --pull]'
+            f'{Colors.ENDC}',
+        )
+
 
 def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
     if myTeam.winner is True:
@@ -384,7 +399,7 @@ def connect_FF(LID: int, wk: int, dev: bool) -> dict:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
-def check_cookies_exists(path) -> None:
+def check_cookies_exists(path: str) -> None:
     if not os.path.exists(path):
         template = {
             "league_id": 0,
@@ -401,7 +416,7 @@ def check_cookies_exists(path) -> None:
         except Exception as e:
             raise SystemExit(e)
 
-def update_cookies(args: argparse.Namespace, path) -> None:
+def update_cookies(path: str, args: argparse.Namespace) -> None:
     try:
         with open(path, 'r+') as f:
             cookies = json.load(f)
@@ -496,10 +511,11 @@ def main() -> int:
         raise SystemExit()
     check_cookies_exists(COOKIES_PATH)
     if args.dev:
-        update_cookies(args, COOKIES_DEV_PATH)
+        update_cookies(COOKIES_DEV_PATH, args)
     else:
-        update_cookies(args, COOKIES_PATH)
-    year = int(load_cookies(args.dev, key='season'))  # type: ignore
+        update_cookies(COOKIES_PATH, args)
+    if not args.season:
+        args.season = int(load_cookies(args.dev, key='season'))  # type: ignore
     if not args.week:
         args.week = load_cookies(args.dev, key='week')  # type: ignore
     if not args.league_id:
@@ -509,29 +525,18 @@ def main() -> int:
     if not args.team_id:
         args.team_id = load_cookies(args.dev, key='team_id')  # type: ignore
     if not args.pull:
-        try:
-            path = pkg_resources.resource_filename(
-                __name__, 'data',
-            )
-            with open(
-                f'''{path}/FF_{year}_wk{args.week}_'''
-                f'''{args.league_id}.json''',
-            ) as rf:
-                d = json.load(rf)
-        except FileNotFoundError as e:
-            raise SystemExit(
-                f'{Colors.RED}{type(e).__name__}: '
-                f'{e}. Data must be pulled first. [ff --pull]'
-                f'{Colors.ENDC}',
-            )
+        path = pkg_resources.resource_filename(
+            __name__, 'data',
+        )
+        d = load_data(path, args)
     else:
         d = connect_FF(args.league_id, args.week, args.dev)
         save_data(
-            d, year, args.week, args.league_id,
+            d, args.season, args.week, args.league_id,
         )
 
     myTeam = Roster(args.team_id)
-    myTeam.generate_roster(d, year, args.week)
+    myTeam.generate_roster(d, args.season, args.week)
     myTeam.get_matchup_score(d, args.week)
     myTeam.get_total_projected()
     myTeam.get_in_play()
@@ -539,7 +544,7 @@ def main() -> int:
     myTeam.sort_roster_by_pos()
     if args.matchup:
         opTeam = Roster(myTeam.op_TID)
-        opTeam.generate_roster(d, year, args.week)
+        opTeam.generate_roster(d, args.season, args.week)
         opTeam.get_matchup_score(d, args.week)
         opTeam.get_total_projected()
         opTeam.get_in_play()
