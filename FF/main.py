@@ -62,49 +62,54 @@ class Roster:
 
     def generate_roster(self, d: dict, year: int, week: int) -> None:
         print('\nAdding players to roster...')
-        for team in d['teams']:
-            if team['id'] == self.TID:
-                for p in team['roster']['entries']:
-                    name = p['playerPoolEntry']['player']['fullName']
-                    slot = slotID[p['lineupSlotId']]
-                    slot_id = p['lineupSlotId']
-                    if slot_id == 23:
-                        slot_id = 7
-                    starting = False if slot == 'B' else True
-                    pos = positionID[
-                        p['playerPoolEntry']
-                        ['player']['defaultPositionId']
-                    ]
-                    proj, score = 0, 0
-                    for stat in p['playerPoolEntry']['player']['stats']:
-                        if (
-                            stat['externalId'] == str(year) and
-                            stat['statSourceId'] == 0
-                        ):
-                            avg = stat['appliedAverage']
-                        if stat['scoringPeriodId'] == week:
-                            if stat['statSourceId'] == 0:
-                                score = stat['appliedTotal']
-                            elif stat['statSourceId'] == 1:
-                                proj = stat['appliedTotal']
+        try:
+            for team in d['teams']:
+                if team['id'] == self.TID:
+                    for p in team['roster']['entries']:
+                        name = p['playerPoolEntry']['player']['fullName']
+                        slot_id = p['lineupSlotId']
+                        slot = slotID[slot_id]
+                        if slot_id == 23:
+                            slot_id = 7
+                        starting = False if slot == 'B' else True
+                        pos = positionID[
+                            p['playerPoolEntry']
+                            ['player']['defaultPositionId']
+                        ]
+                        proj, score = 0, 0
+                        for stat in p['playerPoolEntry']['player']['stats']:
+                            if (
+                                stat['externalId'] == str(year) and
+                                stat['statSourceId'] == 0
+                            ):
+                                avg = stat['appliedAverage']
+                            if stat['scoringPeriodId'] == week:
+                                if stat['statSourceId'] == 0:
+                                    score = stat['appliedTotal']
+                                elif stat['statSourceId'] == 1:
+                                    proj = stat['appliedTotal']
 
-                    status = 'ACTIVE'
-                    rosterLocked = p['playerPoolEntry']['rosterLocked']
-                    try:
-                        status = p['playerPoolEntry']['player']['injuryStatus']
-                    except KeyError:
-                        pass
-                    player = Player(
-                        name, slot, slot_id, pos,
-                        starting, proj, score, avg, status, rosterLocked,
-                    )
+                        rosterLocked = p['playerPoolEntry']['rosterLocked']
+                        try:
+                            status = p['playerPoolEntry']['player']['injuryStatus']
+                        except KeyError:
+                            status = 'ACTIVE'
+                            pass
+                        player = Player(
+                            name, slot, slot_id, pos,
+                            starting, proj, score, avg, status, rosterLocked,
+                        )
 
-                    self.roster.append(player)
-
-        if len(self.roster) == 0:
+                        self.roster.append(player)
+            if len(self.roster) == 0:
+                raise SystemExit(
+                    f'{Colors.RED}Team id: {self.TID} does not exist'
+                    f'{Colors.ENDC}',
+                )
+        except KeyError as e:
             raise SystemExit(
-                f'{Colors.RED}Team id: {self.TID} does not exist'
-                f'{Colors.ENDC}',
+                f'{Colors.RED}Error parsing data. '
+                f'Please try pulling (-p) again.{Colors.ENDC}',
             )
 
     def sort_roster_by_pos(self) -> None:
@@ -287,6 +292,47 @@ class Player(Roster):
                f'{Colors.ENDC}'.expandtabs(3)
 
 
+def check_cookies_exists(path: str) -> None:
+    if not os.path.exists(path):
+        template = {
+            'league_id': 0,
+            'team_id': 0,
+            'season': 0,
+            'week': 0,
+            'SWID': '',
+            'espn_s2': '',
+        }
+        try:
+            with open(path, 'w') as wf:
+                json.dump(template, wf)
+
+        except Exception as e:
+            raise SystemExit(e)
+
+
+def update_cookies(path: str, args: argparse.Namespace) -> None:
+    try:
+        with open(path, 'r+') as f:
+            cookies = json.load(f)
+            if args.league_id:
+                cookies['league_id'] = args.league_id
+            if args.team_id:
+                cookies['team_id'] = args.team_id
+            if args.season:
+                cookies['season'] = args.season
+            if args.week:
+                cookies['week'] = args.week
+            if args.SWID:
+                cookies['SWID'] = args.SWID
+            if args.espn_s2:
+                cookies['espn_s2'] = args.espn_s2
+            f.seek(0, 0)
+            json.dump(cookies, f, indent=2)
+            f.truncate()
+    except Exception as e:
+        raise SystemExit(e)
+
+
 def load_cookies(dev: bool, key: str = None) -> int | dict:
     try:
         if dev:
@@ -316,16 +362,26 @@ def load_cookies(dev: bool, key: str = None) -> int | dict:
         raise type(e)(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
 
 
-def save_data(d: dict, year: int, week: int, LID: int) -> None:
+def print_cookies() -> None:
+    try:
+        with open(COOKIES_PATH) as rf:
+            for line in rf:
+                print(line)
+    except Exception as e:
+        raise SystemExit(e)
+
+
+def save_data(path: str, d: dict, year: int, week: int, LID: int) -> None:
     try:
         with open(
-            f'{DATA_PATH}/FF_{year}_wk{week}_{LID}.json',
+            f'{path}/FF_{year}_wk{week}_{LID}.json',
             'w',
         ) as wf:
             json.dump(d, wf)
         print('Saving data...')
-    except FileNotFoundError as e:
-        raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
+    except OSError as e:
+        raise type(e)(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
+
 
 def load_data(path: str, args: argparse.Namespace) -> dict:
     try:
@@ -336,7 +392,7 @@ def load_data(path: str, args: argparse.Namespace) -> dict:
             d = json.load(rf)
         return d
     except FileNotFoundError as e:
-        raise SystemExit(
+        raise type(e)(
             f'{Colors.RED}{type(e).__name__}: '
             f'{e}. Data must be pulled first. [ff --pull]'
             f'{Colors.ENDC}',
@@ -397,55 +453,6 @@ def connect_FF(LID: int, wk: int, dev: bool) -> dict:
 
     except requests.exceptions.RequestException as e:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
-
-
-def check_cookies_exists(path: str) -> None:
-    if not os.path.exists(path):
-        template = {
-            "league_id": 0,
-            "team_id": 0,
-            "season": 0,
-            "week": 0,
-            "SWID": "",
-            "espn_s2": ""
-        }
-        try:
-            with open(path, 'w') as wf:
-                json.dump(template, wf)
-
-        except Exception as e:
-            raise SystemExit(e)
-
-def update_cookies(path: str, args: argparse.Namespace) -> None:
-    try:
-        with open(path, 'r+') as f:
-            cookies = json.load(f)
-            if args.league_id:
-                cookies['league_id'] = args.league_id
-            if args.team_id:
-                cookies['team_id'] = args.team_id
-            if args.season:
-                cookies['season'] = args.season
-            if args.week:
-                cookies['week'] = args.week
-            if args.SWID:
-                cookies['SWID'] = args.SWID
-            if args.espn_s2:
-                cookies['espn_s2'] = args.espn_s2
-            f.seek(0, 0)
-            json.dump(cookies, f, indent=2)
-            f.truncate()
-    except Exception as e:
-        raise SystemExit(e)
-
-
-def print_cookies() -> None:
-    try:
-        with open(COOKIES_PATH) as rf:
-            for line in rf:
-                print(line)
-    except Exception as e:
-        raise SystemExit(e)
 
 
 def parse_args() -> argparse.Namespace:
@@ -525,14 +532,11 @@ def main() -> int:
     if not args.team_id:
         args.team_id = load_cookies(args.dev, key='team_id')  # type: ignore
     if not args.pull:
-        path = pkg_resources.resource_filename(
-            __name__, 'data',
-        )
-        d = load_data(path, args)
+        d = load_data(DATA_PATH, args)
     else:
         d = connect_FF(args.league_id, args.week, args.dev)
         save_data(
-            d, args.season, args.week, args.league_id,
+            DATA_PATH, d, args.season, args.week, args.league_id,
         )
 
     myTeam = Roster(args.team_id)
