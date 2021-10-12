@@ -53,6 +53,26 @@ class MyMock:
             season=0,
             week=0,
         )
+    def mock_test_data_args_three_players():
+        return argparse.Namespace(
+            league_id=2,
+            season=0,
+            week=0,
+        )
+
+    def mock_test_data_args_decide_flex():
+        return argparse.Namespace(
+            league_id=3,
+            season=0,
+            week=0,
+        )
+
+    def mock_test_data_full_team():
+        return argparse.Namespace(
+            league_id=4,
+            season=0,
+            week=0,
+        )
 
     def mock_args_full():
         return argparse.Namespace(
@@ -108,6 +128,26 @@ def mock_generate_roster():
 @pytest.fixture
 def mock_data_missing_status():
     d = load_data('./tests/data', MyMock.mock_test_data_args_missing_injuryStatus())
+    return d
+
+@pytest.fixture
+def mock_data_three_players():
+    d = load_data('./tests/data', MyMock.mock_test_data_args_three_players())
+    return d
+
+@pytest.fixture
+def mock_data_decide_flex_tiebreak():
+    d = load_data('./tests/data', MyMock.mock_test_data_args_decide_flex())
+    return d
+
+@pytest.fixture
+def mock_data_full_team():
+    d = load_data('./tests/data', MyMock.mock_test_data_full_team())
+    return d
+
+@pytest.fixture
+def mock_data_decide_lineup():
+    d = load_data('./tests/data', MyMock.mock_test_data_full_team())
     return d
 
 
@@ -270,7 +310,7 @@ def test_Roster_roster(mock_generate_roster):
     assert len(mock_generate_roster.roster) == 1
 
 def test_Roster_no_data(mock_roster):
-    with pytest.raises(SystemExit):
+    with pytest.raises(KeyError):
         mock_roster.generate_roster({}, 0, 0)
 
 def test_Roster_no_teams(mock_roster):
@@ -278,7 +318,7 @@ def test_Roster_no_teams(mock_roster):
         mock_roster.generate_roster({'teams': {}}, 0, 0)
 
 def test_Roster_no_players(mock_roster):
-    with pytest.raises(SystemExit):
+    with pytest.raises(KeyError):
         mock_roster.generate_roster({'teams': [{'id': 9}]}, 0, 0)
 
 def test_Roster_no_injuryStatus(mock_roster, mock_data_missing_status):
@@ -304,3 +344,50 @@ def test_Roster_no_injuryStatus(mock_roster, mock_data_missing_status):
 def test_Roster_variables(variable, value, mock_generate_roster):
     p = mock_generate_roster.roster[0]
     assert getattr(p, variable) == value
+
+def test_sort_by_pos(mock_roster, mock_data_three_players):
+    mock_roster.generate_roster(mock_data_three_players, 2021, 1)
+    mock_roster.sort_roster_by_pos()
+    assert mock_roster.roster[0].slot_id == 0
+    assert mock_roster.roster[1].slot_id == 2
+    assert mock_roster.roster[2].slot_id == 4
+
+def test_decide_flex_tiebreak(mock_roster, mock_data_decide_flex_tiebreak):
+    mock_roster.generate_roster(mock_data_decide_flex_tiebreak, 2021, 1)
+    mock_roster.decide_flex()
+    assert mock_roster.roster[0].shouldStart == True
+
+def test_decide_flex_three_players(mock_roster, mock_data_three_players):
+    mock_roster.generate_roster(mock_data_three_players, 2021, 1)
+    mock_roster.decide_flex()
+    assert mock_roster.roster[0].shouldStart == True
+    assert mock_roster.roster[0].proj > mock_roster.roster[1].proj
+
+@pytest.mark.parametrize(
+    ('index', 'last'),
+    (
+        (0, 'Allen'),
+        (1, 'Chubb'),
+        (2, 'Ekeler'),
+        (3, 'Evans'),
+        (4, 'Jones'),
+        (5, 'Smith'),
+        (6, 'Cooks'),
+        (7, 'D/ST'),
+        (8, 'Tucker'),
+    ),
+)
+def test_decide_lineup(index, last, mock_roster, mock_data_full_team):
+    mock_roster.generate_roster(mock_data_full_team, 2021, 1)
+    mock_roster.sort_roster_by_pos()
+    mock_roster.decide_lineup()
+    for p in mock_roster.roster:
+        print(p)
+    shouldStart = [p for p in mock_roster.roster if p.shouldStart]
+    assert len(shouldStart) == 9
+    assert mock_roster.roster[index].last == last
+
+def test_get_total_projected(mock_roster, mock_data_full_team):
+    mock_roster.generate_roster(mock_data_full_team, 2021, 1)
+    mock_roster.get_total_projected()
+    assert mock_roster.total_projected == 92.4

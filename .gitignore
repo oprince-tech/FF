@@ -10,3 +10,4 @@ FF_20*
 .coverage
 /htmlcov
 .tox
+tests/data

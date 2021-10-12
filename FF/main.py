@@ -78,6 +78,7 @@ class Roster:
                         ]
                         proj, score = 0, 0
                         for stat in p['playerPoolEntry']['player']['stats']:
+                            # TODO use last year avg if current year has no avg
                             if (
                                 stat['externalId'] == str(year) and
                                 stat['statSourceId'] == 0
@@ -107,7 +108,7 @@ class Roster:
                     f'{Colors.ENDC}',
                 )
         except KeyError as e:
-            raise SystemExit(
+            raise KeyError(
                 f'{Colors.RED}Error parsing data. '
                 f'Please try pulling (-p) again.{Colors.ENDC}',
             )
