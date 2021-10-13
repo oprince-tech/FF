@@ -201,12 +201,11 @@ class Roster:
             if p.starting:
                 self.total_projected += p.proj
 
-    def get_in_play(self) -> None:
-        self.in_play = 0
+    def get_yet_to_play(self) -> None:
+        self.yet_to_play = 0
         for p in self.roster:
-            if not p.rosterLocked:
-                while self.in_play < 9:
-                    self.in_play += 1
+            if p.starting and not p.rosterLocked:
+                self.yet_to_play += 1
 
     def print_roster(self) -> None:
         print(HEADER)
@@ -419,14 +418,14 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
         print(str(myTeam.roster[i]) + sp + str(opTeam.roster[i]))
     print(('-'*36) + sp + ('-'*36))
 
-    in_play1 = f'Yet to Play: {myTeam.in_play}'
-    in_play2 = f'Yet to Play: {opTeam.in_play}'
+    yet_to_play1 = f'Yet to Play: {myTeam.yet_to_play}'
+    yet_to_play2 = f'Yet to Play: {opTeam.yet_to_play}'
     projected1 = f'{round(myTeam.total_projected, 1):>15}'
     projected2 = f'{round(opTeam.total_projected, 1):>15}'
     print(
-        in_play1 + projected1 + t1 +
+        yet_to_play1 + projected1 + t1 +
         sp +
-        in_play2 + projected2 + t2,
+        yet_to_play2 + projected2 + t2,
     )
 
 
@@ -544,7 +543,7 @@ def main() -> int:
     myTeam.generate_roster(d, args.season, args.week)
     myTeam.get_matchup_score(d, args.week)
     myTeam.get_total_projected()
-    myTeam.get_in_play()
+    myTeam.get_yet_to_play()
     myTeam.decide_lineup()
     myTeam.sort_roster_by_pos()
     if args.matchup:
@@ -552,7 +551,7 @@ def main() -> int:
         opTeam.generate_roster(d, args.season, args.week)
         opTeam.get_matchup_score(d, args.week)
         opTeam.get_total_projected()
-        opTeam.get_in_play()
+        opTeam.get_yet_to_play()
         opTeam.decide_lineup()
         opTeam.sort_roster_by_pos()
         print_matchup(myTeam, opTeam)

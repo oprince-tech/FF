@@ -13,6 +13,7 @@ from FF.main import main
 from FF.main import parse_args
 from FF.main import print_cookies
 from FF.main import Roster
+from FF.main import Player
 from FF.main import save_data
 from FF.main import update_cookies
 
@@ -41,6 +42,21 @@ class MyMock:
             SWID='{SWID}',
             espn_s2='ABCDE12345',
         )
+
+    def mock_player_args():
+        return(
+               'John Reallylonglastname',
+               'QB',
+               0,
+               'QB',
+               True,
+               100.0,
+               0,
+               50.0,
+               'ACTIVE',
+               False
+              )
+
     def mock_test_data_args():
         return argparse.Namespace(
             league_id=0,
@@ -70,6 +86,13 @@ class MyMock:
     def mock_test_data_full_team():
         return argparse.Namespace(
             league_id=4,
+            season=0,
+            week=0,
+        )
+
+    def mock_test_data_full_team_YTP():
+        return argparse.Namespace(
+            league_id=5,
             season=0,
             week=0,
         )
@@ -148,6 +171,16 @@ def mock_data_full_team():
 @pytest.fixture
 def mock_data_decide_lineup():
     d = load_data('./tests/data', MyMock.mock_test_data_full_team())
+    return d
+
+@pytest.fixture
+def mock_data_full_team_YTP():
+    d = load_data('./tests/data', MyMock.mock_test_data_full_team_YTP())
+    return d
+
+@pytest.fixture
+def mock_data_one_player():
+    d = load_data('./tests/data', MyMock.mock_test_data_args())
     return d
 
 
@@ -381,8 +414,6 @@ def test_decide_lineup(index, last, mock_roster, mock_data_full_team):
     mock_roster.generate_roster(mock_data_full_team, 2021, 1)
     mock_roster.sort_roster_by_pos()
     mock_roster.decide_lineup()
-    for p in mock_roster.roster:
-        print(p)
     shouldStart = [p for p in mock_roster.roster if p.shouldStart]
     assert len(shouldStart) == 9
     assert mock_roster.roster[index].last == last
@@ -390,4 +421,34 @@ def test_decide_lineup(index, last, mock_roster, mock_data_full_team):
 def test_get_total_projected(mock_roster, mock_data_full_team):
     mock_roster.generate_roster(mock_data_full_team, 2021, 1)
     mock_roster.get_total_projected()
-    assert mock_roster.total_projected == 92.4
+    assert mock_roster.total_projected == 91.8
+
+def test_get_yet_to_play(mock_roster, mock_data_full_team_YTP):
+    mock_roster.generate_roster(mock_data_full_team_YTP, 2021, 1)
+    mock_roster.get_yet_to_play()
+    assert mock_roster.yet_to_play == 9
+
+def test_get_yet_to_play_three_starting(mock_roster, mock_data_three_players):
+    mock_roster.generate_roster(mock_data_three_players, 2021, 1)
+    mock_roster.get_yet_to_play()
+    assert mock_roster.yet_to_play == 3
+
+def test_print_roster(mock_roster, mock_data_one_player, capsys):
+    mock_roster.generate_roster(mock_data_one_player, 2021, 1)
+    mock_roster.print_roster()
+    out, err = capsys.readouterr()
+    assert out == '\n' \
+                  'Adding players to roster...\n' \
+                  'Slot  Pos Player         Proj  Score\n' \
+                  '------------------------------------\n' \
+                  '\x1b[94mFLX:\x1b[0m  RB  \x1b[32mN. ' \
+                  'Chubb   \x1b[0m   \x1b[90m 13.0\x1b[0m ' \
+                  '\x1b[32m  20.1\x1b[0m\n'
+
+def test_truncate():
+    name, slot, slot_id, pos, starting, \
+    proj, score, avg, status, rosterLocked = MyMock.mock_player_args()
+    mock_player = Player(name, slot, slot_id, pos, starting,
+                         proj, score, avg, status, rosterLocked)
+    mock_player.truncate()
+    assert mock_player.last == 'Reallyl...'
