@@ -92,7 +92,9 @@ class Roster:
 
                         rosterLocked = p['playerPoolEntry']['rosterLocked']
                         try:
-                            status = p['playerPoolEntry']['player']['injuryStatus']
+                            status = (
+                                p['playerPoolEntry']['player']['injuryStatus']
+                            )
                         except KeyError:
                             status = 'ACTIVE'
                             pass
@@ -107,7 +109,7 @@ class Roster:
                     f'{Colors.RED}Team id: {self.TID} does not exist'
                     f'{Colors.ENDC}',
                 )
-        except KeyError as e:
+        except KeyError:
             raise KeyError(
                 f'{Colors.RED}Error parsing data. '
                 f'Please try pulling (-p) again.{Colors.ENDC}',
