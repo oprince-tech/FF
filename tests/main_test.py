@@ -16,6 +16,7 @@ from FF.main import print_cookies
 from FF.main import Roster
 from FF.main import save_data
 from FF.main import update_cookies
+from FF.main import print_matchup
 
 
 class MyMock:
@@ -126,8 +127,6 @@ class MyMock:
             season=0,
             week=0,
         )
-
-
 
 
 @pytest.fixture
@@ -471,3 +470,148 @@ def test_truncate():
     )
     mock_player.truncate()
     assert mock_player.last == 'Reallyl...'
+
+
+def test_NAN_performance():
+    p = Player('John Smith', 'RB', 2, 'RB', True, 0.0, 0.0, 15.0, 'ACTIVE', False)
+    p.rosterLocked = True
+    p.performance_check()
+    assert p.performance == 'NAN'
+
+
+def test_HIGH_performance():
+    p = Player('John Smith', 'RB', 2, 'RB', True, 0.0, 10.0, 15.0, 'ACTIVE', False)
+    p.rosterLocked = True
+    p.performance_check()
+    assert p.performance == 'HIGH'
+
+
+def test_MID_performance():
+    p = Player('John Smith', 'RB', 2, 'RB', True, 9.0, 9.5, 15.0, 'ACTIVE', False)
+    p.rosterLocked = True
+    p.performance_check()
+    assert p.performance == 'MID'
+
+
+def test_MID_performance():
+    p = Player('John Smith', 'RB', 2, 'RB', True, 9.0, 0.0, 15.0, 'ACTIVE', False)
+    p.rosterLocked = True
+    p.performance_check()
+    assert p.performance == 'LOW'
+
+
+@pytest.fixture
+def mock_teams_t1_winner():
+    t1 = Roster(1)
+    t1.winner = True
+    t1.total_score = 100.0
+    t1.total_projected = 300.0
+    t1.yet_to_play = 0
+    t2 = Roster(2)
+    t2.winner = False
+    t2.total_score = 10.0
+    t2.total_projected = 200.0
+    t2.yet_to_play = 0
+    return [t1, t2]
+
+@pytest.fixture
+def mock_teams_t2_winner():
+    t1 = Roster(1)
+    t1.winner = False
+    t1.total_score = 100.0
+    t1.total_projected = 300.0
+    t1.yet_to_play = 0
+    t2 = Roster(2)
+    t2.winner = True
+    t2.total_score = 10.0
+    t2.total_projected = 200.0
+    t2.yet_to_play = 0
+    return [t1, t2]
+
+@pytest.fixture
+def mock_teams_no_winner():
+    t1 = Roster(1)
+    t1.winner = False
+    t1.total_score = 100.0
+    t1.total_projected = 300.0
+    t1.yet_to_play = 1
+    p1 = Player('John Smith', 'RB', 2, 'RB', True, 0.0, 10.0, 15.0, 'ACTIVE', False)
+    t1.roster.append(p1)
+    t2 = Roster(2)
+    t2.winner = False
+    t2.total_score = 10.0
+    t2.total_projected = 200.0
+    t2.yet_to_play = 1
+    p2 = Player('Jane Doe', 'WR', 4, 'WR', True, 0.0, 10.0, 15.0, 'ACTIVE', False)
+    t2.roster.append(p2)
+    return [t1, t2]
+
+def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
+    t1 = mock_teams_t1_winner[0]
+    t2 = mock_teams_t1_winner[1]
+    print_matchup(t1, t2)
+    out, err = capsys.readouterr()
+    color_spacer = '  \033[97;42m \033[0m\033[97;41m \033[0m  '
+    HEADER = '------------------------------------'
+    assert out == 'Slot  Pos Player         Proj  Score' \
+                  f'{color_spacer}' \
+                  'Slot  Pos Player         Proj  Score\n' \
+                  f'{HEADER}' \
+                  f'{color_spacer}' \
+                  f'{HEADER}\n' \
+                  f'{HEADER}' \
+                  f'{color_spacer}' \
+                  f'{HEADER}\n' \
+                  'Yet to Play: 0          300.0\x1b[32m  ' \
+                  '100.0\x1b[0m' \
+                  f'{color_spacer}' \
+                  'Yet to Play: 0          200.0\x1b[91m   ' \
+                  '10.0\x1b[0m\n'
+
+def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
+    t1 = mock_teams_t2_winner[0]
+    t2 = mock_teams_t2_winner[1]
+    print_matchup(t1, t2)
+    out, err = capsys.readouterr()
+    color_spacer = '  \033[97;41m \033[0m\033[97;42m \033[0m  '
+    HEADER = '------------------------------------'
+    assert out == 'Slot  Pos Player         Proj  Score' \
+                  f'{color_spacer}' \
+                  'Slot  Pos Player         Proj  Score\n' \
+                  f'{HEADER}' \
+                  f'{color_spacer}' \
+                  f'{HEADER}\n' \
+                  f'{HEADER}' \
+                  f'{color_spacer}' \
+                  f'{HEADER}\n' \
+                  'Yet to Play: 0          300.0\x1b[91m  ' \
+                  '100.0\x1b[0m' \
+                  f'{color_spacer}' \
+                  'Yet to Play: 0          200.0\x1b[32m   ' \
+                  '10.0\x1b[0m\n'
+
+def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
+    t1 = mock_teams_no_winner[0]
+    t2 = mock_teams_no_winner[1]
+    print_matchup(t1, t2)
+    out, err = capsys.readouterr()
+    color_spacer = '  \033[97;41m \033[0m\033[97;42m \033[0m  '
+    HEADER = '------------------------------------'
+    assert out == 'Slot  Pos Player         Proj  Score' \
+                  '      ' \
+                  'Slot  Pos Player         Proj  Score\n' \
+                  f'{HEADER}' \
+                  '      ' \
+                  f'{HEADER}\n' \
+                  '\x1b[94mRB:\x1b[0m   RB  \x1b[32mJ. Smith   ' \
+                  '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m' \
+                  '      \x1b[94mWR:\x1b[0m   WR  \x1b[32mJ. Doe     ' \
+                  '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m\n' \
+                  f'{HEADER}' \
+                  '      ' \
+                  f'{HEADER}\n' \
+                  'Yet to Play: 1          300.0  ' \
+                  '100.0' \
+                  '      ' \
+                  'Yet to Play: 1          200.0   ' \
+                  '10.0\n'
