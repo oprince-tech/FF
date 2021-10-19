@@ -13,10 +13,10 @@ from FF.main import main
 from FF.main import parse_args
 from FF.main import Player
 from FF.main import print_cookies
+from FF.main import print_matchup
 from FF.main import Roster
 from FF.main import save_data
 from FF.main import update_cookies
-from FF.main import print_matchup
 
 
 class MyMock:
@@ -128,6 +128,13 @@ class MyMock:
             week=0,
         )
 
+    def mock_args_matchup():
+        return argparse.Namespace(
+            league_id=7,
+            season=0,
+            week=0,
+        )
+
 
 @pytest.fixture
 def mock_cookies(monkeypatch):
@@ -192,6 +199,13 @@ def mock_roster_full_team_YTP(mock_roster):
 @pytest.fixture
 def mock_roster_one_player(mock_roster):
     d = load_data('./tests/data', MyMock.mock_args_one_player())
+    mock_roster.generate_roster(d, 2021, 1)
+    return mock_roster
+
+
+@pytest.fixture
+def mock_matchup(mock_roster):
+    d = load_data('./tests/data', MyMock.mock_args_matchup())
     mock_roster.generate_roster(d, 2021, 1)
     return mock_roster
 
@@ -473,28 +487,40 @@ def test_truncate():
 
 
 def test_NAN_performance():
-    p = Player('John Smith', 'RB', 2, 'RB', True, 0.0, 0.0, 15.0, 'ACTIVE', False)
+    p = Player(
+        'John Smith', 'RB', 2, 'RB', True,
+        0.0, 0.0, 15.0, 'ACTIVE', False,
+    )
     p.rosterLocked = True
     p.performance_check()
     assert p.performance == 'NAN'
 
 
 def test_HIGH_performance():
-    p = Player('John Smith', 'RB', 2, 'RB', True, 0.0, 10.0, 15.0, 'ACTIVE', False)
+    p = Player(
+        'John Smith', 'RB', 2, 'RB', True,
+        0.0, 10.0, 15.0, 'ACTIVE', False,
+    )
     p.rosterLocked = True
     p.performance_check()
     assert p.performance == 'HIGH'
 
 
 def test_MID_performance():
-    p = Player('John Smith', 'RB', 2, 'RB', True, 9.0, 9.5, 15.0, 'ACTIVE', False)
+    p = Player(
+        'John Smith', 'RB', 2, 'RB', True,
+        9.0, 9.5, 15.0, 'ACTIVE', False,
+    )
     p.rosterLocked = True
     p.performance_check()
     assert p.performance == 'MID'
 
 
-def test_MID_performance():
-    p = Player('John Smith', 'RB', 2, 'RB', True, 9.0, 0.0, 15.0, 'ACTIVE', False)
+def test_LOW_performance():
+    p = Player(
+        'John Smith', 'RB', 2, 'RB', True,
+        9.0, 0.0, 15.0, 'ACTIVE', False,
+    )
     p.rosterLocked = True
     p.performance_check()
     assert p.performance == 'LOW'
@@ -514,6 +540,7 @@ def mock_teams_t1_winner():
     t2.yet_to_play = 0
     return [t1, t2]
 
+
 @pytest.fixture
 def mock_teams_t2_winner():
     t1 = Roster(1)
@@ -528,6 +555,7 @@ def mock_teams_t2_winner():
     t2.yet_to_play = 0
     return [t1, t2]
 
+
 @pytest.fixture
 def mock_teams_no_winner():
     t1 = Roster(1)
@@ -535,16 +563,23 @@ def mock_teams_no_winner():
     t1.total_score = 100.0
     t1.total_projected = 300.0
     t1.yet_to_play = 1
-    p1 = Player('John Smith', 'RB', 2, 'RB', True, 0.0, 10.0, 15.0, 'ACTIVE', False)
+    p1 = Player(
+        'John Smith', 'RB', 2, 'RB', True,
+        0.0, 10.0, 15.0, 'ACTIVE', False,
+    )
     t1.roster.append(p1)
     t2 = Roster(2)
     t2.winner = False
     t2.total_score = 10.0
     t2.total_projected = 200.0
     t2.yet_to_play = 1
-    p2 = Player('Jane Doe', 'WR', 4, 'WR', True, 0.0, 10.0, 15.0, 'ACTIVE', False)
+    p2 = Player(
+        'Jane Doe', 'WR', 4, 'WR', True,
+        0.0, 10.0, 15.0, 'ACTIVE', False,
+    )
     t2.roster.append(p2)
     return [t1, t2]
+
 
 def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
     t1 = mock_teams_t1_winner[0]
@@ -568,6 +603,7 @@ def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
                   'Yet to Play: 0          200.0\x1b[91m   ' \
                   '10.0\x1b[0m\n'
 
+
 def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
     t1 = mock_teams_t2_winner[0]
     t2 = mock_teams_t2_winner[1]
@@ -590,12 +626,12 @@ def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
                   'Yet to Play: 0          200.0\x1b[32m   ' \
                   '10.0\x1b[0m\n'
 
+
 def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
     t1 = mock_teams_no_winner[0]
     t2 = mock_teams_no_winner[1]
     print_matchup(t1, t2)
     out, err = capsys.readouterr()
-    color_spacer = '  \033[97;41m \033[0m\033[97;42m \033[0m  '
     HEADER = '------------------------------------'
     assert out == 'Slot  Pos Player         Proj  Score' \
                   '      ' \
@@ -615,3 +651,45 @@ def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
                   '      ' \
                   'Yet to Play: 1          200.0   ' \
                   '10.0\n'
+
+
+def test_matchup_op_home_winner(mock_roster):
+    args = argparse.Namespace(league_id=6, season=0, week=0)
+    d = load_data('./tests/data', args)
+    mock_roster.get_matchup_score(d, 1)
+    assert mock_roster.winner is False
+
+
+def test_matchup_mt_away_winner(mock_roster):
+    args = argparse.Namespace(league_id=7, season=0, week=0)
+    d = load_data('./tests/data', args)
+    mock_roster.get_matchup_score(d, 1)
+    assert mock_roster.winner is True
+
+
+def test_matchup_mt_home_winner(mock_roster):
+    args = argparse.Namespace(league_id=8, season=0, week=0)
+    d = load_data('./tests/data', args)
+    mock_roster.get_matchup_score(d, 1)
+    assert mock_roster.winner is True
+
+
+def test_matchup_op_away_winner(mock_roster):
+    args = argparse.Namespace(league_id=9, season=0, week=0)
+    d = load_data('./tests/data', args)
+    mock_roster.get_matchup_score(d, 1)
+    assert mock_roster.winner is False
+
+
+def test_matchup_mt_home_live(mock_roster):
+    args = argparse.Namespace(league_id=10, season=0, week=0)
+    d = load_data('./tests/data', args)
+    mock_roster.get_matchup_score(d, 1)
+    assert mock_roster.total_score == 10.0
+
+
+def test_matchup_mt_away_live(mock_roster):
+    args = argparse.Namespace(league_id=11, season=0, week=0)
+    d = load_data('./tests/data', args)
+    mock_roster.get_matchup_score(d, 1)
+    assert mock_roster.total_score == 100.0
