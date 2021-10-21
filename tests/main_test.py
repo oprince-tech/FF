@@ -30,7 +30,18 @@ class MyMock:
             'season': 0,
             'week': 0,
             'SWID': '',
-                    'espn_s2': '',
+            'espn_s2': '',
+        }
+        return cookies
+
+    def mock_updated_cookies(*args):
+        cookies = {
+            'league_id': 131034,
+            'team_id': 1,
+            'season': 2021,
+            'week': 1,
+            'SWID': '{SWID}',
+            'espn_s2': 'ABCDE12345',
         }
         return cookies
 
@@ -128,13 +139,6 @@ class MyMock:
             week=0,
         )
 
-    def mock_args_matchup():
-        return argparse.Namespace(
-            league_id=7,
-            season=0,
-            week=0,
-        )
-
 
 @pytest.fixture
 def mock_cookies(monkeypatch):
@@ -204,13 +208,6 @@ def mock_roster_one_player(mock_roster):
 
 
 @pytest.fixture
-def mock_matchup(mock_roster):
-    d = load_data('./tests/data', MyMock.mock_args_matchup())
-    mock_roster.generate_roster(d, 2021, 1)
-    return mock_roster
-
-
-@pytest.fixture
 def mock_template(monkeypatch):
     monkeypatch.setattr(json, 'dump', None)
 
@@ -272,6 +269,22 @@ def test_update_cookies_fail(tmpdir):
         file = tmpdir.join('cookies.json')
         args = argparse.Namespace()
         update_cookies(file, args)
+
+
+def test_update_cookies(tmpdir):
+    file = tmpdir.join('cookies.json')
+    p1 = mock.patch('builtins.open', mock.mock_open(read_data=''))
+    m = mock.MagicMock(return_value=MyMock.mock_cookies())
+    p2 = mock.patch('json.load', m)
+    p3 = mock.patch('json.dump')
+    with p1 as p_open:
+        with p2 as p_json_load:
+            with p3 as p_json_dump:
+                update_cookies(file, MyMock.mock_args_cookies())
+                p_open.assert_called_once()
+                p_json_load.assert_called_once()
+                cookies = MyMock.mock_updated_cookies()
+                p_json_dump.assert_called_with(cookies, p_open(), indent=2)
 
 
 @pytest.mark.parametrize(
@@ -693,3 +706,7 @@ def test_matchup_mt_away_live(mock_roster):
     d = load_data('./tests/data', args)
     mock_roster.get_matchup_score(d, 1)
     assert mock_roster.total_score == 100.0
+
+
+def test_connect_FF():
+    pass
