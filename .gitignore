@@ -1,4 +1,6 @@
+cookies.json
 cookies-**.json
+FF_0**.json
 weekly_data/*
 /venv
 .mypy_cache

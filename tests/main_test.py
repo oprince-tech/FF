@@ -3,6 +3,7 @@ import builtins
 import json
 import sys
 from unittest import mock
+import requests
 
 import pytest
 
@@ -17,6 +18,7 @@ from FF.main import print_matchup
 from FF.main import Roster
 from FF.main import save_data
 from FF.main import update_cookies
+from FF.main import connect_FF
 
 
 class MyMock:
@@ -82,6 +84,7 @@ class MyMock:
             matchup=True,
             dev=False,
         )
+
 
     def mock_args_default():
         return argparse.Namespace(
@@ -708,5 +711,31 @@ def test_matchup_mt_away_live(mock_roster):
     assert mock_roster.total_score == 100.0
 
 
-def test_connect_FF():
-    pass
+@mock.patch('requests.get')
+def test_connect_FF(mock_get):
+    mock_get.return_value = mock.Mock(status_code=200, json=lambda : {"test": "test"})
+    status_code, d = connect_FF(0, 0, False)
+    assert status_code == 200
+    # assert d == {"test": "test"}
+
+@mock.patch('requests.get', side_effect=requests.exceptions.RequestException)
+def test_connect_FF_exception(mock_get):
+    mock_get.return_value = mock.Mock(status_code=400, json=lambda : {"test": "test"})
+    with pytest.raises(SystemExit):
+        status_code, d = connect_FF(0, 0, False)
+
+
+def test_main():
+    sys.argv = ['ff']
+    r = main()
+    assert r == 0
+
+def test_main_dev():
+    sys.argv = ['ff', '-d']
+    r = main()
+    assert r == 0
+
+def test_main_dev_matchup():
+    sys.argv = ['ff', '-d', '-m']
+    r = main()
+    assert r == 0

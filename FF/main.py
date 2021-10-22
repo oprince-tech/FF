@@ -450,8 +450,8 @@ def connect_FF(LID: int, wk: int, dev: bool) -> dict:
             url, params={'scoringPeriodId': str(wk)},
             cookies={'SWID': swid, 'espn_s2': espn_s2},
         )
-        d = r.json()
-        return d
+        print(f'STATUS: {r.status_code}')
+        return r.status_code, r.json()
 
     except requests.exceptions.RequestException as e:
         raise SystemExit(f'{Colors.RED}{type(e).__name__}: {e}{Colors.ENDC}')
@@ -536,8 +536,8 @@ def main() -> int:
     if not args.pull:
         d = load_data(DATA_PATH, args)
     else:
-        d = connect_FF(args.league_id, args.week, args.dev)
-        save_data(
+        status_code, d = connect_FF(args.league_id, args.week, args.dev) # pragma: no cover
+        save_data( # pragma: no cover
             DATA_PATH, d, args.season, args.week, args.league_id,
         )
 
@@ -563,5 +563,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == '__main__': # pragma: no cover
     raise SystemExit(main())
