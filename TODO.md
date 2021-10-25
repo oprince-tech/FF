@@ -18,3 +18,4 @@
 - [x] - Ellipses for long names
 - [x] - Winner indication
 - [x] - re-implement separate week json files to keep earlier weeks data
+- [x] - print_matchup case where roster lengths are not equal

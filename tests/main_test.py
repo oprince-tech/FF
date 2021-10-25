@@ -3,11 +3,12 @@ import builtins
 import json
 import sys
 from unittest import mock
-import requests
 
 import pytest
+import requests
 
 from FF.main import check_cookies_exists
+from FF.main import connect_FF
 from FF.main import load_cookies
 from FF.main import load_data
 from FF.main import main
@@ -18,7 +19,6 @@ from FF.main import print_matchup
 from FF.main import Roster
 from FF.main import save_data
 from FF.main import update_cookies
-from FF.main import connect_FF
 
 
 class MyMock:
@@ -84,7 +84,6 @@ class MyMock:
             matchup=True,
             dev=False,
         )
-
 
     def mock_args_default():
         return argparse.Namespace(
@@ -597,6 +596,46 @@ def mock_teams_no_winner():
     return [t1, t2]
 
 
+@pytest.fixture
+def mock_teams_myTeam_empty():
+    t1 = Roster(1)
+    t1.winner = False
+    t1.total_score = 0.0
+    t1.total_projected = 0.0
+    t1.yet_to_play = 0
+    t2 = Roster(2)
+    t2.winner = False
+    t2.total_score = 0.0
+    t2.total_projected = 0.0
+    t2.yet_to_play = 1
+    p2 = Player(
+        'Jane Doe', 'WR', 4, 'WR', True,
+        0.0, 10.0, 15.0, 'ACTIVE', False,
+    )
+    t2.roster.append(p2)
+    return [t1, t2]
+
+
+@pytest.fixture
+def mock_teams_opTeam_empty():
+    t1 = Roster(1)
+    t1.winner = False
+    t1.total_score = 0.0
+    t1.total_projected = 0.0
+    t1.yet_to_play = 1
+    p1 = Player(
+        'John Smith', 'RB', 2, 'RB', True,
+        0.0, 10.0, 15.0, 'ACTIVE', False,
+    )
+    t1.roster.append(p1)
+    t2 = Roster(2)
+    t2.winner = False
+    t2.total_score = 0.0
+    t2.total_projected = 0.0
+    t2.yet_to_play = 0
+    return [t1, t2]
+
+
 def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
     t1 = mock_teams_t1_winner[0]
     t2 = mock_teams_t1_winner[1]
@@ -604,20 +643,21 @@ def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
     out, err = capsys.readouterr()
     color_spacer = '  \033[97;42m \033[0m\033[97;41m \033[0m  '
     HEADER = '------------------------------------'
-    assert out == 'Slot  Pos Player         Proj  Score' \
-                  f'{color_spacer}' \
-                  'Slot  Pos Player         Proj  Score\n' \
-                  f'{HEADER}' \
-                  f'{color_spacer}' \
-                  f'{HEADER}\n' \
-                  f'{HEADER}' \
-                  f'{color_spacer}' \
-                  f'{HEADER}\n' \
-                  'Yet to Play: 0          300.0\x1b[32m  ' \
-                  '100.0\x1b[0m' \
-                  f'{color_spacer}' \
-                  'Yet to Play: 0          200.0\x1b[91m   ' \
-                  '10.0\x1b[0m\n'
+    exp = 'Slot  Pos Player         Proj  Score' \
+          f'{color_spacer}' \
+          'Slot  Pos Player         Proj  Score\n' \
+          f'{HEADER}' \
+          f'{color_spacer}' \
+          f'{HEADER}\n' \
+          f'{HEADER}' \
+          f'{color_spacer}' \
+          f'{HEADER}\n' \
+          'Yet to Play: 0          300.0\x1b[32m  ' \
+          '100.0\x1b[0m' \
+          f'{color_spacer}' \
+          'Yet to Play: 0          200.0\x1b[91m   ' \
+          '10.0\x1b[0m\n'
+    assert out == exp
 
 
 def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
@@ -627,20 +667,21 @@ def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
     out, err = capsys.readouterr()
     color_spacer = '  \033[97;41m \033[0m\033[97;42m \033[0m  '
     HEADER = '------------------------------------'
-    assert out == 'Slot  Pos Player         Proj  Score' \
-                  f'{color_spacer}' \
-                  'Slot  Pos Player         Proj  Score\n' \
-                  f'{HEADER}' \
-                  f'{color_spacer}' \
-                  f'{HEADER}\n' \
-                  f'{HEADER}' \
-                  f'{color_spacer}' \
-                  f'{HEADER}\n' \
-                  'Yet to Play: 0          300.0\x1b[91m  ' \
-                  '100.0\x1b[0m' \
-                  f'{color_spacer}' \
-                  'Yet to Play: 0          200.0\x1b[32m   ' \
-                  '10.0\x1b[0m\n'
+    exp = 'Slot  Pos Player         Proj  Score' \
+          f'{color_spacer}' \
+          'Slot  Pos Player         Proj  Score\n' \
+          f'{HEADER}' \
+          f'{color_spacer}' \
+          f'{HEADER}\n' \
+          f'{HEADER}' \
+          f'{color_spacer}' \
+          f'{HEADER}\n' \
+          'Yet to Play: 0          300.0\x1b[91m  ' \
+          '100.0\x1b[0m' \
+          f'{color_spacer}' \
+          'Yet to Play: 0          200.0\x1b[32m   ' \
+          '10.0\x1b[0m\n'
+    assert out == exp
 
 
 def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
@@ -649,24 +690,77 @@ def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
     print_matchup(t1, t2)
     out, err = capsys.readouterr()
     HEADER = '------------------------------------'
-    assert out == 'Slot  Pos Player         Proj  Score' \
-                  '      ' \
-                  'Slot  Pos Player         Proj  Score\n' \
-                  f'{HEADER}' \
-                  '      ' \
-                  f'{HEADER}\n' \
-                  '\x1b[94mRB:\x1b[0m   RB  \x1b[32mJ. Smith   ' \
-                  '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m' \
-                  '      \x1b[94mWR:\x1b[0m   WR  \x1b[32mJ. Doe     ' \
-                  '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m\n' \
-                  f'{HEADER}' \
-                  '      ' \
-                  f'{HEADER}\n' \
-                  'Yet to Play: 1          300.0  ' \
-                  '100.0' \
-                  '      ' \
-                  'Yet to Play: 1          200.0   ' \
-                  '10.0\n'
+    exp = 'Slot  Pos Player         Proj  Score' \
+          '      ' \
+          'Slot  Pos Player         Proj  Score\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          '\x1b[94mRB:\x1b[0m   RB  \x1b[32mJ. Smith   ' \
+          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m' \
+          '      \x1b[94mWR:\x1b[0m   WR  \x1b[32mJ. Doe     ' \
+          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          'Yet to Play: 1          300.0  ' \
+          '100.0' \
+          '      ' \
+          'Yet to Play: 1          200.0   ' \
+          '10.0\n'
+    assert out == exp
+
+
+def test_print_matchup_myTeam_empty(mock_teams_myTeam_empty, capsys):
+    t1 = mock_teams_myTeam_empty[0]
+    t2 = mock_teams_myTeam_empty[1]
+    print_matchup(t1, t2)
+    out, err = capsys.readouterr()
+    HEADER = '------------------------------------'
+    exp = 'Slot  Pos Player         Proj  Score' \
+          '      ' \
+          'Slot  Pos Player         Proj  Score\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          '\x1b[90mB:                                  \x1b[0m' \
+          '      \x1b[94mWR:\x1b[0m   WR  \x1b[32mJ. Doe     ' \
+          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          'Yet to Play: 0            0.0    ' \
+          '0.0' \
+          '      ' \
+          'Yet to Play: 1            0.0    ' \
+          '0.0\n'
+    assert out == exp
+
+
+def test_print_matchup_opTeam_empty(mock_teams_opTeam_empty, capsys):
+    t1 = mock_teams_opTeam_empty[0]
+    t2 = mock_teams_opTeam_empty[1]
+    print_matchup(t1, t2)
+    out, err = capsys.readouterr()
+    HEADER = '------------------------------------'
+    exp = 'Slot  Pos Player         Proj  Score' \
+          '      ' \
+          'Slot  Pos Player         Proj  Score\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          '\x1b[94mRB:\x1b[0m   RB  \x1b[32mJ. Smith   ' \
+          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m' \
+          '      \x1b[90mB:                                  \x1b[0m\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          'Yet to Play: 1            0.0    ' \
+          '0.0' \
+          '      ' \
+          'Yet to Play: 0            0.0    ' \
+          '0.0\n'
+    assert out == exp
 
 
 def test_matchup_op_home_winner(mock_roster):
@@ -713,14 +807,19 @@ def test_matchup_mt_away_live(mock_roster):
 
 @mock.patch('requests.get')
 def test_connect_FF(mock_get):
-    mock_get.return_value = mock.Mock(status_code=200, json=lambda : {"test": "test"})
+    mock_get.return_value = mock.Mock(
+        status_code=200, json=lambda: {'test': 'test'},
+    )
     status_code, d = connect_FF(0, 0, False)
     assert status_code == 200
     # assert d == {"test": "test"}
 
+
 @mock.patch('requests.get', side_effect=requests.exceptions.RequestException)
 def test_connect_FF_exception(mock_get):
-    mock_get.return_value = mock.Mock(status_code=400, json=lambda : {"test": "test"})
+    mock_get.return_value = mock.Mock(
+        status_code=400, json=lambda: {'test': 'test'},
+    )
     with pytest.raises(SystemExit):
         status_code, d = connect_FF(0, 0, False)
 
@@ -730,10 +829,12 @@ def test_main():
     r = main()
     assert r == 0
 
+
 def test_main_dev():
     sys.argv = ['ff', '-d']
     r = main()
     assert r == 0
+
 
 def test_main_dev_matchup():
     sys.argv = ['ff', '-d', '-m']

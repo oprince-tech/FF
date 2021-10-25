@@ -4,6 +4,7 @@ import argparse
 import json
 import operator
 import os
+from itertools import zip_longest
 
 import pkg_resources  # type: ignore
 import requests  # type: ignore
@@ -416,8 +417,20 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
         t2 = f'{round(opTeam.total_score, 1):>7}'
     print(HEADER + sp + HEADER)
     print(('-'*36) + sp + ('-'*36))
-    for i in range(len(myTeam.roster)):
-        print(str(myTeam.roster[i]) + sp + str(opTeam.roster[i]))
+
+    empty = f'{Colors.BLACK}B:{(" "*34)}{Colors.ENDC}'
+    for i, (myPlayer, opPlayer) in enumerate(
+        zip_longest(
+            myTeam.roster,
+            opTeam.roster,
+        ),
+    ):
+        if not myPlayer:
+            print(empty + sp + str(opPlayer))
+        elif not opPlayer:
+            print(str(myPlayer) + sp + empty)
+        else:
+            print(str(myPlayer) + sp + str(opPlayer))
     print(('-'*36) + sp + ('-'*36))
 
     yet_to_play1 = f'Yet to Play: {myTeam.yet_to_play}'
@@ -431,7 +444,7 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
     )
 
 
-def connect_FF(LID: int, wk: int, dev: bool) -> dict:
+def connect_FF(LID: int, wk: int, dev: bool) -> tuple[int, dict]:
     c = load_cookies(dev)
     year = c['season']  # type: ignore
     swid = c['SWID']  # type: ignore
@@ -536,8 +549,10 @@ def main() -> int:
     if not args.pull:
         d = load_data(DATA_PATH, args)
     else:
-        status_code, d = connect_FF(args.league_id, args.week, args.dev) # pragma: no cover
-        save_data( # pragma: no cover
+        status_code, d = connect_FF(
+            args.league_id, args.week, args.dev,
+        )  # pragma: no cover
+        save_data(  # pragma: no cover
             DATA_PATH, d, args.season, args.week, args.league_id,
         )
 
@@ -563,5 +578,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == '__main__': # pragma: no cover
+if __name__ == '__main__':  # pragma: no cover
     raise SystemExit(main())
