@@ -1,0 +1,17 @@
+{
+  "schedule": [
+    {
+      "away": {
+        "teamId": 9,
+        "totalPointsLive": 100.0
+      },
+      "home": {
+        "teamId": 1,
+        "totalPointsLive": 10.0
+      },
+      "id": 1,
+      "matchupPeriodId": 1,
+      "winner": "None"
+    }
+  ]
+}

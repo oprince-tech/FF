@@ -1,9 +1,9 @@
 cookies.json
 cookies-**.json
-FF_0**.json
 weekly_data/*
 /venv
 .mypy_cache
+.pytest_cache
 __pycache__
 FF.egg-info
 FF_20*
@@ -12,4 +12,3 @@ FF_20*
 .coverage
 /htmlcov
 .tox
-tests/data
