@@ -1,4 +1,4 @@
-from __future__ import annotations
+from __future__ import annotations  # python3.7+
 
 import argparse
 import json
