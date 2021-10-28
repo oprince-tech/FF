@@ -85,6 +85,48 @@ class MyMock:
             dev=False,
         )
 
+    def mock_args_main():
+        return argparse.Namespace(
+            pull=False,
+            week=0,
+            league_id=4,
+            team_id=9,
+            season=0,
+            cookies=False,
+            SWID='{12345}',
+            espn_s2='ABCDE12345',
+            matchup=False,
+            dev=False,
+        )
+
+    def mock_args_main_dev():
+        return argparse.Namespace(
+            pull=False,
+            week=0,
+            league_id=None,
+            team_id=None,
+            season=0,
+            cookies=False,
+            SWID='{12345}',
+            espn_s2='ABCDE12345',
+            matchup=False,
+            dev=True,
+        )
+
+    def mock_args_main_matchup():
+        return argparse.Namespace(
+            pull=False,
+            week=0,
+            league_id=4,
+            team_id=9,
+            season=0,
+            cookies=False,
+            SWID='{12345}',
+            espn_s2='ABCDE12345',
+            matchup=True,
+            dev=False,
+        )
+
     def mock_args_default():
         return argparse.Namespace(
             pull=False,
@@ -242,7 +284,8 @@ def test_parse_args_full(input):
     assert args == MyMock.mock_args_full()
 
 
-def test_print_cookies_succeed_exit():
+@mock.patch('FF.main.print_cookies')
+def test_print_cookies_succeed_exit(mock_print_cookies):
     sys.argv = ['ff', '-c']
     with pytest.raises(SystemExit):
         main()
@@ -293,18 +336,6 @@ def test_update_cookies(tmpdir):
     ('dev', 'key', 'expected'),
     [
         (
-            True,
-            None,
-            {
-                'league_id': 0,
-                'team_id': 0,
-                'season': 0,
-                'week': 0,
-                'SWID': '',
-                'espn_s2': '',
-            },
-        ),
-        (
             False,
             None,
             {
@@ -322,14 +353,26 @@ def test_update_cookies(tmpdir):
             0,
         ),
         (
-            True,
+            False,
             'week',
             0,
         ),
     ],
 )
 def test_load_cookies(dev, key, expected, mock_cookies):
-    assert load_cookies(dev, key=key) == expected
+    with mock.patch(
+        'builtins.open', mock.mock_open(
+            read_data='{'
+            '"league_id": 0, '
+            '"team_id": 0, '
+            '"season": 0, '
+            '"week": 0, '
+            '"SWID": "", '
+            '"espn_s2": ""'
+            '}',
+        ),
+    ):
+        assert load_cookies(dev, key=key) == expected
 
 
 @pytest.mark.parametrize(
@@ -342,13 +385,25 @@ def test_load_cookies(dev, key, expected, mock_cookies):
 )
 def test_load_cookies_fail(input, error_type):
     with pytest.raises(error_type):
-        load_cookies(True, input)
+        with mock.patch(
+            'builtins.open', mock.mock_open(
+                read_data='{'
+                '"league_id": 0, '
+                '"team_id": 0, '
+                '"season": 0, '
+                '"week": 0, '
+                '"SWID": "", '
+                '"espn_s2": ""'
+                '}',
+            ),
+        ):
+            load_cookies(False, input)
 
 
 @mock.patch('builtins.open', side_effect=FileNotFoundError)
 def test_load_cookies_FileNotFoundError(mock_FileNotFoundError):
     with pytest.raises(FileNotFoundError):
-        load_cookies(True, None)
+        load_cookies(False, None)
 
 
 def test_load_data(tmpdir, mock_json_data):
@@ -548,6 +603,7 @@ def mock_teams_t1_winner():
     t1.total_score = 100.0
     t1.total_projected = 300.0
     t1.yet_to_play = 0
+    t1.op_TID = 2
     t2 = Roster(2)
     t2.winner = False
     t2.total_score = 10.0
@@ -805,8 +861,9 @@ def test_matchup_mt_away_live(mock_roster):
     assert mock_roster.total_score == 100.0
 
 
+@mock.patch('FF.main.load_cookies')
 @mock.patch('requests.get')
-def test_connect_FF(mock_get):
+def test_connect_FF(mock_get, mock_load_cookies):
     mock_get.return_value = mock.Mock(
         status_code=200, json=lambda: {'test': 'test'},
     )
@@ -815,8 +872,9 @@ def test_connect_FF(mock_get):
     # assert d == {"test": "test"}
 
 
+@mock.patch('FF.main.load_cookies')
 @mock.patch('requests.get', side_effect=requests.exceptions.RequestException)
-def test_connect_FF_exception(mock_get):
+def test_connect_FF_exception(mock_get, mock_load_cookies):
     mock_get.return_value = mock.Mock(
         status_code=400, json=lambda: {'test': 'test'},
     )
@@ -824,19 +882,83 @@ def test_connect_FF_exception(mock_get):
         status_code, d = connect_FF(0, 0, False)
 
 
-def test_main():
-    sys.argv = ['ff']
+@mock.patch('FF.main.load_data')
+@mock.patch('FF.main.Roster.sort_roster_by_pos')
+@mock.patch('FF.main.Roster.decide_lineup')
+@mock.patch('FF.main.Roster.get_yet_to_play')
+@mock.patch('FF.main.Roster.get_total_projected')
+@mock.patch('FF.main.Roster.get_matchup_score')
+@mock.patch('FF.main.Roster.generate_roster')
+@mock.patch('FF.main.load_cookies', return_value=4)
+@mock.patch('FF.main.update_cookies')
+@mock.patch('FF.main.parse_args', return_value=MyMock.mock_args_main())
+def test_main(
+    mock_args_main,
+    update_cookies,
+    load_cookies,
+    generate_roster,
+    get_matchup_score,
+    get_total_projected,
+    get_yet_to_play,
+    decide_lineup,
+    sort_roster_by_pos,
+    mock_load_data,
+):
     r = main()
     assert r == 0
 
 
-def test_main_dev():
-    sys.argv = ['ff', '-d']
+@mock.patch('FF.main.load_data')
+@mock.patch('FF.main.Roster.sort_roster_by_pos')
+@mock.patch('FF.main.Roster.decide_lineup')
+@mock.patch('FF.main.Roster.get_yet_to_play')
+@mock.patch('FF.main.Roster.get_total_projected')
+@mock.patch('FF.main.Roster.get_matchup_score')
+@mock.patch('FF.main.Roster.generate_roster')
+@mock.patch('FF.main.load_cookies', return_value=4)
+@mock.patch('FF.main.update_cookies')
+@mock.patch('FF.main.parse_args', return_value=MyMock.mock_args_main_dev())
+def test_main_dev(
+    mock_args_main,
+    update_cookies,
+    load_cookies,
+    generate_roster,
+    get_matchup_score,
+    get_total_projected,
+    get_yet_to_play,
+    decide_lineup,
+    sort_roster_by_pos,
+    mock_load_data,
+):
     r = main()
     assert r == 0
 
 
-def test_main_dev_matchup():
-    sys.argv = ['ff', '-d', '-m']
-    r = main()
-    assert r == 0
+@mock.patch('FF.main.print_matchup')
+@mock.patch('FF.main.load_data')
+@mock.patch('FF.main.Roster.sort_roster_by_pos')
+@mock.patch('FF.main.Roster.decide_lineup')
+@mock.patch('FF.main.Roster.get_yet_to_play')
+@mock.patch('FF.main.Roster.get_total_projected')
+@mock.patch('FF.main.Roster.get_matchup_score')
+@mock.patch('FF.main.Roster.generate_roster')
+@mock.patch('FF.main.load_cookies', return_value=4)
+@mock.patch('FF.main.update_cookies')
+@mock.patch('FF.main.parse_args', return_value=MyMock.mock_args_main_matchup())
+def test_main_matchup(
+    mock_args_main,
+    update_cookies,
+    load_cookies,
+    generate_roster,
+    get_matchup_score,
+    get_total_projected,
+    get_yet_to_play,
+    decide_lineup,
+    sort_roster_by_pos,
+    mock_load_data,
+    print_matchup,
+):
+    with mock.patch('FF.main.Roster') as myTeam:
+        myTeam.op_TID = 4
+        r = main()
+        assert r == 0
