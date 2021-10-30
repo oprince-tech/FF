@@ -35,9 +35,21 @@ positionID = {
     4: 'TE', 5: 'K', 16: 'DST',
 }
 
+TEAM_HEADER = ('\u2502{:<7}{:<9}{:<12}{:<6}\u2502').format(
+    'Team', 'Record', 'Rank', 'PO%',
+)
+
+
 HEADER = ('{:<6}{:<4}{:<15}{:<6}{}').format(
     'Slot', 'Pos', 'Player', 'Proj', 'Score',
 )
+
+
+class Box:
+    TOP_BOX = ('{}{}{}').format('\u250C', '\u2500'*34, '\u2510')
+    MID_BOX = ('{}{}{}').format('\u251C', '\u254C'*34, '\u2524')
+    BTM_BOX = ('{}{}{}').format('\u2514', '\u2500'*34, '\u2518')
+    DOUBLE_LINE = '\u2550'
 
 
 class Colors:
@@ -60,12 +72,23 @@ class Roster:
     def __init__(self, TID: int) -> None:
         self.roster: list[Player] = []
         self.TID = TID
+        self.wins = 0
+        self.losses = 0
+        self.ties = 0
+        self.rank = 0
+        self.playoffPct = 0
+        self.abbrev = ''
+        self.yet_to_play = 0
 
     def generate_roster(self, d: dict, year: int, week: int) -> None:
         print('\nAdding players to roster...')
         try:
             for team in d['teams']:
                 if team['id'] == self.TID:
+                    result = team['currentSimulationResults']
+                    self.rank = result['rank']
+                    self.playoffPct = round(result['playoffPct'] * 100, 2)
+                    self.abbrev = team['abbrev']
                     for p in team['roster']['entries']:
                         name = p['playerPoolEntry']['player']['fullName']
                         slot_id = p['lineupSlotId']
@@ -78,6 +101,13 @@ class Roster:
                             ['player']['defaultPositionId']
                         ]
                         proj, score = 0, 0
+                        try:
+                            status = (
+                                p['playerPoolEntry']['player']['injuryStatus']
+                            )
+                        except KeyError:
+                            status = 'ACTIVE'
+                            pass
                         for stat in p['playerPoolEntry']['player']['stats']:
                             # TODO use last year avg if current year has no avg
                             if (
@@ -89,16 +119,13 @@ class Roster:
                                 if stat['statSourceId'] == 0:
                                     score = stat['appliedTotal']
                                 elif stat['statSourceId'] == 1:
-                                    proj = stat['appliedTotal']
+                                    if stat['appliedTotal']:
+                                        proj = stat['appliedTotal']
+                                    else:
+                                        proj = stat['appliedTotal']
+                                        status = 'BYE'
 
                         rosterLocked = p['playerPoolEntry']['rosterLocked']
-                        try:
-                            status = (
-                                p['playerPoolEntry']['player']['injuryStatus']
-                            )
-                        except KeyError:
-                            status = 'ACTIVE'
-                            pass
                         player = Player(
                             name, slot, slot_id, pos,
                             starting, proj, score, avg, status, rosterLocked,
@@ -115,6 +142,30 @@ class Roster:
                 f'{Colors.RED}Error parsing data. '
                 f'Please try pulling (-p) again.{Colors.ENDC}',
             )
+
+    def generate_record(self, d: dict) -> None:
+        for matchup in d['schedule']:
+            if matchup['winner'] != 'UNDECIDED':
+                if (
+                    matchup['away']['teamId'] == self.TID and
+                    matchup['winner'] == 'AWAY'
+                ):
+                    self.wins += 1
+                elif (
+                    matchup['away']['teamId'] == self.TID and
+                    matchup['winner'] == 'HOME'
+                ):
+                    self.losses += 1
+                elif (
+                    matchup['home']['teamId'] == self.TID and
+                    matchup['winner'] == 'HOME'
+                ):
+                    self.wins += 1
+                elif (
+                    matchup['home']['teamId'] == self.TID and
+                    matchup['winner'] == 'AWAY'
+                ):
+                    self.losses += 1
 
     def sort_roster_by_pos(self) -> None:
         self.roster.sort(key=operator.attrgetter('slot_id'))
@@ -211,10 +262,28 @@ class Roster:
                 self.yet_to_play += 1
 
     def print_roster(self) -> None:
+        print(Box.TOP_BOX)
+        print(f'{TEAM_HEADER:<34}')
+        print(Box.MID_BOX)
+        team_details = ('\u2502{:<7}{}-{}-{}    {:<12}{:<6}\u2502').format(
+            self.abbrev,
+            self.wins,
+            self.losses,
+            self.ties,
+            self.rank,
+            self.playoffPct,
+        )
+        print(team_details)
+        print(Box.BTM_BOX)
         print(HEADER)
-        print('-'*36)
+        print(Box.DOUBLE_LINE*36)
         for p in self.roster:
             print(p)
+        yet_to_play = f'Yet to Play: {self.yet_to_play}'
+        projected1 = f'{round(self.total_projected, 1):>15}'
+        total = f'{round(self.total_score, 1):>7}'
+        print(Box.DOUBLE_LINE*36)
+        print(f'{yet_to_play}{projected1}{total}')
 
 
 class Player(Roster):
@@ -254,6 +323,7 @@ class Player(Roster):
             'DOUBTFUL': Colors.RED,
             'INJURY_RESERVE': Colors.RED,
             'SUSPENSION': Colors.RED,
+            'BYE': Colors.MAGENTA,
         }
         self.color_starting = color_starting[self.starting]
         self.color_status = color_status[self.status]
@@ -415,8 +485,31 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
         sp = '      '
         t1 = f'{round(myTeam.total_score, 1):>7}'
         t2 = f'{round(opTeam.total_score, 1):>7}'
+    myTeam_details = ('\u2502{:<7}{}-{}-{}    {:<12}{:<6}\u2502').format(
+        myTeam.abbrev,
+        myTeam.wins,
+        myTeam.losses,
+        myTeam.ties,
+        myTeam.rank,
+        myTeam.playoffPct,
+    )
+    opTeam_details = ('\u2502{:<7}{}-{}-{}    {:<12}{:<6}\u2502').format(
+        opTeam.abbrev,
+        opTeam.wins,
+        opTeam.losses,
+        opTeam.ties,
+        opTeam.rank,
+        opTeam.playoffPct,
+    )
+
+    print((Box.TOP_BOX) + sp + (Box.TOP_BOX))
+    print(f'{TEAM_HEADER:<34}' + sp + f'{TEAM_HEADER:<34}')
+    print(Box.MID_BOX + sp + Box.MID_BOX)
+    print(myTeam_details + sp + opTeam_details)
+    print(Box.BTM_BOX + sp + Box.BTM_BOX)
+
     print(HEADER + sp + HEADER)
-    print(('-'*36) + sp + ('-'*36))
+    print(('\u2550'*36) + sp + ('\u2550'*36))
 
     empty = f'{Colors.BLACK}B:{(" "*34)}{Colors.ENDC}'
     for i, (myPlayer, opPlayer) in enumerate(
@@ -431,7 +524,7 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
             print(str(myPlayer) + sp + empty)
         else:
             print(str(myPlayer) + sp + str(opPlayer))
-    print(('-'*36) + sp + ('-'*36))
+    print(('\u2550'*36) + sp + ('\u2550'*36))
 
     yet_to_play1 = f'Yet to Play: {myTeam.yet_to_play}'
     yet_to_play2 = f'Yet to Play: {opTeam.yet_to_play}'
@@ -452,11 +545,9 @@ def connect_FF(LID: int, wk: int, dev: bool) -> tuple[int, dict]:
 
     url = (
         f'https://fantasy.espn.com/apis/v3/games/ffl/seasons/{year}/'
-        f'segments/0/leagues/{LID}?view=mMatchup&view=mMatchupScore'
-        '&view=mPositionalRatings'
+        f'segments/0/leagues/{LID}?view=mStandings&view=mMatchup'
+        '&view=mMatchupScore&view=mPositionalRatings'
     )
-    # Def ratings against position
-    # https://fantasy.espn.com/apis/v3/games/ffl/seasons/2021/segments/0/leagues/131034?view=kona_player_info
 
     try:
         r = requests.get(
@@ -558,6 +649,7 @@ def main() -> int:
 
     myTeam = Roster(args.team_id)
     myTeam.generate_roster(d, args.season, args.week)
+    myTeam.generate_record(d)
     myTeam.get_matchup_score(d, args.week)
     myTeam.get_total_projected()
     myTeam.get_yet_to_play()
@@ -566,6 +658,7 @@ def main() -> int:
     if args.matchup:
         opTeam = Roster(myTeam.op_TID)
         opTeam.generate_roster(d, args.season, args.week)
+        opTeam.generate_record(d)
         opTeam.get_matchup_score(d, args.week)
         opTeam.get_total_projected()
         opTeam.get_yet_to_play()

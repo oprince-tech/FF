@@ -4,8 +4,8 @@
 
 - [ ] Lengthen D/ST team names
 - [ ] Tiebreak on decide flex decided on opp def or last week score or carries/YPC
-- [ ] Add owner to print_roster
-- [ ] possible BYE week color
+- [ ] LRU cache
+- [ ] Record
 ### In Progress
 ### Completed
 - [x] argparse
@@ -20,3 +20,5 @@
 - [x] Winner indication
 - [x] re-implement separate week json files to keep earlier weeks data
 - [x] print_matchup case where roster lengths are not equal
+- [x] possible BYE week color
+- [x] Add owner to print_roster

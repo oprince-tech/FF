@@ -4,6 +4,11 @@
   "seasonId": 2021,
   "teams": [
     {
+      "abbrev": "TYB",
+      "currentSimulationResults": {
+        "playoffPct": 0.924,
+        "rank": 3
+      },
       "id": 9,
       "roster": {
         "appliedStatTotal": 87.3,

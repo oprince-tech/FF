@@ -434,6 +434,13 @@ def test_save_data_failed(mock_OSError, tmpdir):
 def test_roster_init(mock_roster):
     assert isinstance(mock_roster.roster, list)
     assert isinstance(mock_roster.TID, int)
+    assert isinstance(mock_roster.wins, int)
+    assert isinstance(mock_roster.losses, int)
+    assert isinstance(mock_roster.ties, int)
+    assert isinstance(mock_roster.rank, int)
+    assert isinstance(mock_roster.playoffPct, int)
+    assert isinstance(mock_roster.abbrev, str)
+    assert isinstance(mock_roster.yet_to_play, int)
 
 
 def test_Roster_roster(mock_generate_roster):
@@ -536,13 +543,22 @@ def test_get_yet_to_play_three_starting(mock_roster_three_players):
 
 
 def test_print_roster(mock_roster_one_player, capsys):
+    mock_roster_one_player.total_projected = 0
+    mock_roster_one_player.total_score = 0
     mock_roster_one_player.print_roster()
     out, err = capsys.readouterr()
-    assert out == 'Slot  Pos Player         Proj  Score\n' \
-                  '------------------------------------\n' \
-                  '\x1b[94mFLX:\x1b[0m  RB  \x1b[32mN. ' \
-                  'Chubb   \x1b[0m   \x1b[90m 13.0\x1b[0m ' \
-                  '\x1b[32m  20.1\x1b[0m\n'
+    HEADER = '\u2550'*36
+    listed = out.split('\n')
+    culled = listed[5:]
+    joined = '\n'.join(culled)
+    exp = 'Slot  Pos Player         Proj  Score\n' \
+          f'{HEADER}\n' \
+          '\x1b[94mFLX:\x1b[0m  RB  \x1b[32mN. ' \
+          'Chubb   \x1b[0m   \x1b[90m 13.0\x1b[0m ' \
+          '\x1b[32m  20.1\x1b[0m\n' \
+          f'{HEADER}\n' \
+          'Yet to Play: 0              0      0\n'
+    assert joined == exp
 
 
 def test_truncate():
@@ -698,7 +714,7 @@ def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
     print_matchup(t1, t2)
     out, err = capsys.readouterr()
     color_spacer = '  \033[97;42m \033[0m\033[97;41m \033[0m  '
-    HEADER = '------------------------------------'
+    HEADER = '\u2550'*36
     exp = 'Slot  Pos Player         Proj  Score' \
           f'{color_spacer}' \
           'Slot  Pos Player         Proj  Score\n' \
@@ -713,7 +729,10 @@ def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
           f'{color_spacer}' \
           'Yet to Play: 0          200.0\x1b[91m   ' \
           '10.0\x1b[0m\n'
-    assert out == exp
+    listed = out.split('\n')
+    culled = listed[5:]
+    joined = '\n'.join(culled)
+    assert joined == exp
 
 
 def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
@@ -722,7 +741,7 @@ def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
     print_matchup(t1, t2)
     out, err = capsys.readouterr()
     color_spacer = '  \033[97;41m \033[0m\033[97;42m \033[0m  '
-    HEADER = '------------------------------------'
+    HEADER = '\u2550'*36
     exp = 'Slot  Pos Player         Proj  Score' \
           f'{color_spacer}' \
           'Slot  Pos Player         Proj  Score\n' \
@@ -737,7 +756,10 @@ def test_print_matchup_t2_winner(mock_teams_t2_winner, capsys):
           f'{color_spacer}' \
           'Yet to Play: 0          200.0\x1b[32m   ' \
           '10.0\x1b[0m\n'
-    assert out == exp
+    listed = out.split('\n')
+    culled = listed[5:]
+    joined = '\n'.join(culled)
+    assert joined == exp
 
 
 def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
@@ -745,7 +767,7 @@ def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
     t2 = mock_teams_no_winner[1]
     print_matchup(t1, t2)
     out, err = capsys.readouterr()
-    HEADER = '------------------------------------'
+    HEADER = '\u2550'*36
     exp = 'Slot  Pos Player         Proj  Score' \
           '      ' \
           'Slot  Pos Player         Proj  Score\n' \
@@ -764,7 +786,10 @@ def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
           '      ' \
           'Yet to Play: 1          200.0   ' \
           '10.0\n'
-    assert out == exp
+    listed = out.split('\n')
+    culled = listed[5:]
+    joined = '\n'.join(culled)
+    assert joined == exp
 
 
 def test_print_matchup_myTeam_empty(mock_teams_myTeam_empty, capsys):
@@ -772,7 +797,7 @@ def test_print_matchup_myTeam_empty(mock_teams_myTeam_empty, capsys):
     t2 = mock_teams_myTeam_empty[1]
     print_matchup(t1, t2)
     out, err = capsys.readouterr()
-    HEADER = '------------------------------------'
+    HEADER = '\u2550'*36
     exp = 'Slot  Pos Player         Proj  Score' \
           '      ' \
           'Slot  Pos Player         Proj  Score\n' \
@@ -790,7 +815,10 @@ def test_print_matchup_myTeam_empty(mock_teams_myTeam_empty, capsys):
           '      ' \
           'Yet to Play: 1            0.0    ' \
           '0.0\n'
-    assert out == exp
+    listed = out.split('\n')
+    culled = listed[5:]
+    joined = '\n'.join(culled)
+    assert joined == exp
 
 
 def test_print_matchup_opTeam_empty(mock_teams_opTeam_empty, capsys):
@@ -798,7 +826,7 @@ def test_print_matchup_opTeam_empty(mock_teams_opTeam_empty, capsys):
     t2 = mock_teams_opTeam_empty[1]
     print_matchup(t1, t2)
     out, err = capsys.readouterr()
-    HEADER = '------------------------------------'
+    HEADER = '\u2550'*36
     exp = 'Slot  Pos Player         Proj  Score' \
           '      ' \
           'Slot  Pos Player         Proj  Score\n' \
@@ -816,7 +844,10 @@ def test_print_matchup_opTeam_empty(mock_teams_opTeam_empty, capsys):
           '      ' \
           'Yet to Play: 0            0.0    ' \
           '0.0\n'
-    assert out == exp
+    listed = out.split('\n')
+    culled = listed[5:]
+    joined = '\n'.join(culled)
+    assert joined == exp
 
 
 def test_matchup_op_home_winner(mock_roster):
@@ -882,12 +913,20 @@ def test_connect_FF_exception(mock_get, mock_load_cookies):
         status_code, d = connect_FF(0, 0, False)
 
 
+def test_Roster_generate_record(mock_roster):
+    args = argparse.Namespace(league_id=6, season=0, week=0)
+    d = load_data('./tests/data', args)
+    mock_roster.generate_record(d)
+
+
 @mock.patch('FF.main.load_data')
+@mock.patch('FF.main.Roster.print_roster')
 @mock.patch('FF.main.Roster.sort_roster_by_pos')
 @mock.patch('FF.main.Roster.decide_lineup')
 @mock.patch('FF.main.Roster.get_yet_to_play')
 @mock.patch('FF.main.Roster.get_total_projected')
 @mock.patch('FF.main.Roster.get_matchup_score')
+@mock.patch('FF.main.Roster.generate_record')
 @mock.patch('FF.main.Roster.generate_roster')
 @mock.patch('FF.main.load_cookies', return_value=4)
 @mock.patch('FF.main.update_cookies')
@@ -897,11 +936,13 @@ def test_main(
     update_cookies,
     load_cookies,
     generate_roster,
+    generate_record,
     get_matchup_score,
     get_total_projected,
     get_yet_to_play,
     decide_lineup,
     sort_roster_by_pos,
+    print_roster,
     mock_load_data,
 ):
     r = main()
@@ -909,11 +950,13 @@ def test_main(
 
 
 @mock.patch('FF.main.load_data')
+@mock.patch('FF.main.Roster.print_roster')
 @mock.patch('FF.main.Roster.sort_roster_by_pos')
 @mock.patch('FF.main.Roster.decide_lineup')
 @mock.patch('FF.main.Roster.get_yet_to_play')
 @mock.patch('FF.main.Roster.get_total_projected')
 @mock.patch('FF.main.Roster.get_matchup_score')
+@mock.patch('FF.main.Roster.generate_record')
 @mock.patch('FF.main.Roster.generate_roster')
 @mock.patch('FF.main.load_cookies', return_value=4)
 @mock.patch('FF.main.update_cookies')
@@ -923,24 +966,27 @@ def test_main_dev(
     update_cookies,
     load_cookies,
     generate_roster,
+    generate_record,
     get_matchup_score,
     get_total_projected,
     get_yet_to_play,
     decide_lineup,
     sort_roster_by_pos,
+    print_roster,
     mock_load_data,
 ):
     r = main()
     assert r == 0
 
 
-@mock.patch('FF.main.print_matchup')
 @mock.patch('FF.main.load_data')
+@mock.patch('FF.main.print_matchup')
 @mock.patch('FF.main.Roster.sort_roster_by_pos')
 @mock.patch('FF.main.Roster.decide_lineup')
 @mock.patch('FF.main.Roster.get_yet_to_play')
 @mock.patch('FF.main.Roster.get_total_projected')
 @mock.patch('FF.main.Roster.get_matchup_score')
+@mock.patch('FF.main.Roster.generate_record')
 @mock.patch('FF.main.Roster.generate_roster')
 @mock.patch('FF.main.load_cookies', return_value=4)
 @mock.patch('FF.main.update_cookies')
@@ -950,13 +996,14 @@ def test_main_matchup(
     update_cookies,
     load_cookies,
     generate_roster,
+    generate_record,
     get_matchup_score,
     get_total_projected,
     get_yet_to_play,
     decide_lineup,
     sort_roster_by_pos,
-    mock_load_data,
     print_matchup,
+    mock_load_data,
 ):
     with mock.patch('FF.main.Roster') as myTeam:
         myTeam.op_TID = 4

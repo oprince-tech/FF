@@ -12,6 +12,45 @@
       "id": 1,
       "matchupPeriodId": 1,
       "winner": "HOME"
+    },
+    {
+      "away": {
+        "teamId": 9,
+        "totalPoints": 10.0
+      },
+      "home": {
+        "teamId": 1,
+        "totalPoints": 100.0
+      },
+      "id": 2,
+      "matchupPeriodId": 2,
+      "winner": "AWAY"
+    },
+    {
+      "away": {
+        "teamId": 1,
+        "totalPoints": 10.0
+      },
+      "home": {
+        "teamId": 9,
+        "totalPoints": 100.0
+      },
+      "id": 2,
+      "matchupPeriodId": 2,
+      "winner": "AWAY"
+    },
+    {
+      "away": {
+        "teamId": 1,
+        "totalPoints": 10.0
+      },
+      "home": {
+        "teamId": 9,
+        "totalPoints": 100.0
+      },
+      "id": 2,
+      "matchupPeriodId": 2,
+      "winner": "HOME"
     }
   ]
 }

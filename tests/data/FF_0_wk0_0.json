@@ -1,7 +1,17 @@
 {
   "teams": [
     {
+      "abbrev": "TYB",
+      "currentSimulationResults": {
+        "playoffPct": 0.924,
+        "rank": 3
+      },
       "id": 9,
+      "location": "Team",
+      "nickname": "Younger Brother",
+      "owners": [
+        "{0F689315-181B-4DAE-A893-15181B6DAE98}"
+      ],
       "roster": {
         "appliedStatTotal": 87.3,
         "entries": [
