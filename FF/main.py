@@ -102,9 +102,13 @@ class Roster:
                         ]
                         proj, score = 0, 0
                         try:
+                            injured = (
+                                p['playerPoolEntry']['player']['injured']
+                            )
                             status = (
                                 p['playerPoolEntry']['player']['injuryStatus']
                             )
+
                         except KeyError:
                             status = 'ACTIVE'
                             pass
@@ -123,7 +127,8 @@ class Roster:
                                         proj = stat['appliedTotal']
                                     else:
                                         proj = stat['appliedTotal']
-                                        status = 'BYE'
+                                        if not injured:
+                                            status = 'BYE'
 
                         rosterLocked = p['playerPoolEntry']['rosterLocked']
                         player = Player(
