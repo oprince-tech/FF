@@ -57,20 +57,6 @@ class MyMock:
             espn_s2='ABCDE12345',
         )
 
-    def mock_player_args():
-        return(
-            'John Reallylonglastname',
-            'QB',
-            0,
-            'QB',
-            True,
-            100.0,
-            0,
-            50.0,
-            'ACTIVE',
-            False,
-        )
-
     def mock_args_full():
         return argparse.Namespace(
             pull=True,
@@ -448,7 +434,7 @@ def test_Roster_roster(mock_generate_roster):
 
 
 def test_Roster_no_data(mock_roster):
-    with pytest.raises(KeyError):
+    with pytest.raises(SystemExit):
         mock_roster.generate_roster({}, 0, 0)
 
 
@@ -458,7 +444,7 @@ def test_Roster_no_teams(mock_roster):
 
 
 def test_Roster_no_players(mock_roster):
-    with pytest.raises(KeyError):
+    with pytest.raises(SystemExit):
         mock_roster.generate_roster({'teams': [{'id': 9}]}, 0, 0)
 
 
@@ -547,67 +533,65 @@ def test_print_roster(mock_roster_one_player, capsys):
     mock_roster_one_player.total_score = 0
     mock_roster_one_player.print_roster()
     out, err = capsys.readouterr()
-    HEADER = '\u2550'*36
+    HEADER = '\u2550'*80
     listed = out.split('\n')
     culled = listed[5:]
     joined = '\n'.join(culled)
-    exp = 'Slot  Pos Player         Proj  Score\n' \
+    exp = 'Slot  Pos Player         Proj  Score  ' \
+          'TAR/gm    Yds   Cmp%   TD      AVG     TOT\n' \
           f'{HEADER}\n' \
           '\x1b[94mFLX:\x1b[0m  RB  \x1b[32mN. ' \
           'Chubb   \x1b[0m   \x1b[90m 13.0\x1b[0m ' \
-          '\x1b[32m  20.1\x1b[0m\n' \
+          '\x1b[32m  20.1\x1b[0m' \
+          '      29' \
+          '    199' \
+          '      -' \
+          '    3' \
+          '     17.9' \
+          '    35.9\n' \
           f'{HEADER}\n' \
           'Yet to Play: 0              0      0\n'
     assert joined == exp
 
 
-def test_truncate():
-    name, slot, slot_id, pos, starting, \
-        proj, score, avg, status, rosterLocked = MyMock.mock_player_args()
-    mock_player = Player(
-        name, slot, slot_id, pos, starting,
-        proj, score, avg, status, rosterLocked,
-    )
-    mock_player.truncate()
-    assert mock_player.last == 'Reallyl...'
+@mock.patch('FF.main.Player.generate_player_stats')
+@mock.patch('FF.main.Player.generate_player_info')
+def test_truncate(mock_generate_info, mock_generate_stats):
+    p = Player({}, 0, 0)
+    p.last = 'Reallylonglastname'
+    p.truncate()
+    assert p.last == 'Reallyl...'
 
 
-def test_NAN_performance():
-    p = Player(
-        'John Smith', 'RB', 2, 'RB', True,
-        0.0, 0.0, 15.0, 'ACTIVE', False,
-    )
+@mock.patch('FF.main.Player.generate_player_stats')
+@mock.patch('FF.main.Player.generate_player_info')
+def test_HIGH_performance(mock_generate_info, mock_generate_stats):
+    p = Player({}, 0, 0)
     p.rosterLocked = True
-    p.performance_check()
-    assert p.performance == 'NAN'
-
-
-def test_HIGH_performance():
-    p = Player(
-        'John Smith', 'RB', 2, 'RB', True,
-        0.0, 10.0, 15.0, 'ACTIVE', False,
-    )
-    p.rosterLocked = True
+    p.score = 100
+    p.proj = 10
     p.performance_check()
     assert p.performance == 'HIGH'
 
 
-def test_MID_performance():
-    p = Player(
-        'John Smith', 'RB', 2, 'RB', True,
-        9.0, 9.5, 15.0, 'ACTIVE', False,
-    )
+@mock.patch('FF.main.Player.generate_player_stats')
+@mock.patch('FF.main.Player.generate_player_info')
+def test_MID_performance(mock_generate_info, mock_generate_stats):
+    p = Player({}, 0, 0)
     p.rosterLocked = True
+    p.score = 10
+    p.proj = 10
     p.performance_check()
     assert p.performance == 'MID'
 
 
-def test_LOW_performance():
-    p = Player(
-        'John Smith', 'RB', 2, 'RB', True,
-        9.0, 0.0, 15.0, 'ACTIVE', False,
-    )
+@mock.patch('FF.main.Player.generate_player_stats')
+@mock.patch('FF.main.Player.generate_player_info')
+def test_LOW_performance(mock_generate_info, mock_generate_stats):
+    p = Player({}, 0, 0)
     p.rosterLocked = True
+    p.score = 10
+    p.proj = 100
     p.performance_check()
     assert p.performance == 'LOW'
 
@@ -650,21 +634,11 @@ def mock_teams_no_winner():
     t1.total_score = 100.0
     t1.total_projected = 300.0
     t1.yet_to_play = 1
-    p1 = Player(
-        'John Smith', 'RB', 2, 'RB', True,
-        0.0, 10.0, 15.0, 'ACTIVE', False,
-    )
-    t1.roster.append(p1)
     t2 = Roster(2)
     t2.winner = False
     t2.total_score = 10.0
     t2.total_projected = 200.0
     t2.yet_to_play = 1
-    p2 = Player(
-        'Jane Doe', 'WR', 4, 'WR', True,
-        0.0, 10.0, 15.0, 'ACTIVE', False,
-    )
-    t2.roster.append(p2)
     return [t1, t2]
 
 
@@ -680,10 +654,10 @@ def mock_teams_myTeam_empty():
     t2.total_score = 0.0
     t2.total_projected = 0.0
     t2.yet_to_play = 1
-    p2 = Player(
-        'Jane Doe', 'WR', 4, 'WR', True,
-        0.0, 10.0, 15.0, 'ACTIVE', False,
-    )
+    d = load_data('./tests/data', MyMock.mock_args_one_player())
+    d1 = d['teams'][0]['roster']['entries'][0]
+    p2 = Player(d1, 2021, 1)
+    p2.rosterLocked = True
     t2.roster.append(p2)
     return [t1, t2]
 
@@ -695,10 +669,10 @@ def mock_teams_opTeam_empty():
     t1.total_score = 0.0
     t1.total_projected = 0.0
     t1.yet_to_play = 1
-    p1 = Player(
-        'John Smith', 'RB', 2, 'RB', True,
-        0.0, 10.0, 15.0, 'ACTIVE', False,
-    )
+    d = load_data('./tests/data', MyMock.mock_args_one_player())
+    d1 = d['teams'][0]['roster']['entries'][0]
+    p1 = Player(d1, 2021, 1)
+    p1.rosterLocked = True
     t1.roster.append(p1)
     t2 = Roster(2)
     t2.winner = False
@@ -706,6 +680,59 @@ def mock_teams_opTeam_empty():
     t2.total_projected = 0.0
     t2.yet_to_play = 0
     return [t1, t2]
+
+
+@pytest.fixture
+def mock_teams_one_player_each():
+    t1 = Roster(1)
+    t1.winner = False
+    t1.total_score = 0.0
+    t1.total_projected = 0.0
+    t1.yet_to_play = 0
+    d = load_data('./tests/data', MyMock.mock_args_three_players())
+    d1 = d['teams'][0]['roster']['entries'][0]
+    p1 = Player(d1, 2021, 1)
+    t1.roster.append(p1)
+    t2 = Roster(2)
+    t2.winner = False
+    t2.total_score = 0.0
+    t2.total_projected = 0.0
+    t2.yet_to_play = 0
+    d2 = d['teams'][0]['roster']['entries'][1]
+    p2 = Player(d2, 2021, 1)
+    t2.roster.append(p2)
+    return [t1, t2]
+
+
+def test_print_matchup_one_player_each(mock_teams_one_player_each, capsys):
+    t1 = mock_teams_one_player_each[0]
+    t2 = mock_teams_one_player_each[1]
+    print_matchup(t1, t2)
+    out, err = capsys.readouterr()
+    HEADER = '\u2550'*36
+    exp = 'Slot  Pos Player         Proj  Score' \
+          '      ' \
+          'Slot  Pos Player         Proj  Score\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          '\x1b[94mRB:\x1b[0m   RB  \x1b[32mN. Chubb   \x1b[0m   ' \
+          '\x1b[90m 13.0\x1b[0m ' \
+          '\x1b[97m   0.0\x1b[0m      ' \
+          '\x1b[94mWR:\x1b[0m   WR  \x1b[95mM. Evans   ' \
+          '\x1b[0m   \x1b[90m    0\x1b[0m \x1b[97m   2.4\x1b[0m\n' \
+          f'{HEADER}' \
+          '      ' \
+          f'{HEADER}\n' \
+          'Yet to Play: 0            0.0    ' \
+          '0.0' \
+          '      ' \
+          'Yet to Play: 0            0.0    ' \
+          '0.0\n'
+    listed = out.split('\n')
+    culled = listed[5:]
+    joined = '\n'.join(culled)
+    assert joined == exp
 
 
 def test_print_matchup_t1_winner(mock_teams_t1_winner, capsys):
@@ -774,10 +801,6 @@ def test_print_matchup_no_winner(mock_teams_no_winner, capsys):
           f'{HEADER}' \
           '      ' \
           f'{HEADER}\n' \
-          '\x1b[94mRB:\x1b[0m   RB  \x1b[32mJ. Smith   ' \
-          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m' \
-          '      \x1b[94mWR:\x1b[0m   WR  \x1b[32mJ. Doe     ' \
-          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m\n' \
           f'{HEADER}' \
           '      ' \
           f'{HEADER}\n' \
@@ -804,9 +827,10 @@ def test_print_matchup_myTeam_empty(mock_teams_myTeam_empty, capsys):
           f'{HEADER}' \
           '      ' \
           f'{HEADER}\n' \
-          '\x1b[90mB:                                  \x1b[0m' \
-          '      \x1b[94mWR:\x1b[0m   WR  \x1b[32mJ. Doe     ' \
-          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m\n' \
+          '\x1b[90mB:                                  \x1b[0m      ' \
+          '\x1b[94mFLX:\x1b[0m  RB  \x1b[32mN. Chubb   ' \
+          '\x1b[0m   \x1b[90m 13.0\x1b[0m ' \
+          '\x1b[32m  20.1\x1b[0m\n' \
           f'{HEADER}' \
           '      ' \
           f'{HEADER}\n' \
@@ -833,9 +857,11 @@ def test_print_matchup_opTeam_empty(mock_teams_opTeam_empty, capsys):
           f'{HEADER}' \
           '      ' \
           f'{HEADER}\n' \
-          '\x1b[94mRB:\x1b[0m   RB  \x1b[32mJ. Smith   ' \
-          '\x1b[0m   \x1b[90m  0.0\x1b[0m \x1b[97m  10.0\x1b[0m' \
-          '      \x1b[90mB:                                  \x1b[0m\n' \
+          '\x1b[94mFLX:\x1b[0m  RB  \x1b[32mN. Chubb   \x1b[0m   ' \
+          '\x1b[90m 13.0\x1b[0m ' \
+          '\x1b[32m  20.1\x1b[0m      ' \
+          '\x1b[90mB:                                  ' \
+          '\x1b[0m\n' \
           f'{HEADER}' \
           '      ' \
           f'{HEADER}\n' \

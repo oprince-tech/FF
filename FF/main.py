@@ -40,8 +40,15 @@ TEAM_HEADER = ('\u2502{:<7}{:<9}{:<12}{:<6}\u2502').format(
 )
 
 
-HEADER = ('{:<6}{:<4}{:<15}{:<6}{}').format(
+HEADER = ('{:<6}{:<4}{:<15}{:<6}{:<5}').format(
     'Slot', 'Pos', 'Player', 'Proj', 'Score',
+)
+
+HEADER_EXT = (
+    '{:<6}{:<4}{:<15}{:<6}{:<7}{:<5}{:>7}{:>7}{:>5}{:>9}{:>8}'
+).format(
+    'Slot', 'Pos', 'Player', 'Proj', 'Score',
+    'TAR/gm', 'Yds', 'Cmp%', 'TD', 'AVG', 'TOT',
 )
 
 
@@ -90,61 +97,16 @@ class Roster:
                     self.playoffPct = round(result['playoffPct'] * 100, 2)
                     self.abbrev = team['abbrev']
                     for p in team['roster']['entries']:
-                        name = p['playerPoolEntry']['player']['fullName']
-                        slot_id = p['lineupSlotId']
-                        slot = slotID[slot_id]
-                        if slot_id == 23:
-                            slot_id = 7
-                        starting = False if slot == 'B' else True
-                        pos = positionID[
-                            p['playerPoolEntry']
-                            ['player']['defaultPositionId']
-                        ]
-                        proj, score = 0, 0
-                        try:
-                            injured = (
-                                p['playerPoolEntry']['player']['injured']
-                            )
-                            status = (
-                                p['playerPoolEntry']['player']['injuryStatus']
-                            )
-
-                        except KeyError:
-                            status = 'ACTIVE'
-                            pass
-                        for stat in p['playerPoolEntry']['player']['stats']:
-                            # TODO use last year avg if current year has no avg
-                            if (
-                                stat['externalId'] == str(year) and
-                                stat['statSourceId'] == 0
-                            ):
-                                avg = stat['appliedAverage']
-                            if stat['scoringPeriodId'] == week:
-                                if stat['statSourceId'] == 0:
-                                    score = stat['appliedTotal']
-                                elif stat['statSourceId'] == 1:
-                                    if stat['appliedTotal']:
-                                        proj = stat['appliedTotal']
-                                    else:
-                                        proj = stat['appliedTotal']
-                                        if not injured:
-                                            status = 'BYE'
-
-                        rosterLocked = p['playerPoolEntry']['rosterLocked']
-                        player = Player(
-                            name, slot, slot_id, pos,
-                            starting, proj, score, avg, status, rosterLocked,
-                        )
-
+                        player = Player(p, year, week)
                         self.roster.append(player)
             if len(self.roster) == 0:
                 raise SystemExit(
                     f'{Colors.RED}Team id: {self.TID} does not exist'
                     f'{Colors.ENDC}',
                 )
-        except KeyError:
-            raise KeyError(
-                f'{Colors.RED}Error parsing data. '
+        except KeyError as e:
+            raise SystemExit(
+                f'{Colors.RED}{type(e).__name__}: Error parsing data. '
                 f'Please try pulling (-p) again.{Colors.ENDC}',
             )
 
@@ -190,7 +152,7 @@ class Roster:
         tiebreak = [p for p in flex_spot if p.proj == max]
 
         if len(tiebreak) >= 2:
-            tiebreak.sort(key=operator.attrgetter('avg'), reverse=True)
+            tiebreak.sort(key=operator.attrgetter('fpts_avg'), reverse=True)
             # need tiebreak for equal averages
             flex = tiebreak[0]
         else:
@@ -280,37 +242,130 @@ class Roster:
         )
         print(team_details)
         print(Box.BTM_BOX)
-        print(HEADER)
-        print(Box.DOUBLE_LINE*36)
+        print(HEADER_EXT)
+        print(Box.DOUBLE_LINE*80)
         for p in self.roster:
-            print(p)
+            print(p.print_player(ext=True))
         yet_to_play = f'Yet to Play: {self.yet_to_play}'
         projected1 = f'{round(self.total_projected, 1):>15}'
         total = f'{round(self.total_score, 1):>7}'
-        print(Box.DOUBLE_LINE*36)
+        print(Box.DOUBLE_LINE*80)
         print(f'{yet_to_play}{projected1}{total}')
 
 
 class Player(Roster):
-    def __init__(
-        self, name: str, slot: str, slot_id: int, pos: str,
-        starting: bool, proj: float, score: float, avg: float, status: str,
-        rosterLocked: bool,
-    ) -> None:
-        self.first = name.split(' ')[0]
-        self.last = name.split(' ')[1]
-        self.slot = slot
-        self.slot_id = slot_id
-        self.pos = pos.upper()
-        self.starting = starting
+    def __init__(self, p: dict, year: int, week: int) -> None:
+        self.year = year
+        self.week = week
+        self.proj = 0
+        self.score = 0
         self.shouldStart = False
-        self.proj = round(proj, 1)
-        self.score = round(score, 1)
-        self.avg = round(avg, 1)
-        self.status = status
-        self.rosterLocked = rosterLocked
+        self.rosterLocked = False
         self.performance = 'NAN'
+        self.generate_player_info(p)
+        self.generate_player_stats(p)
         self.performance_check()
+
+    def generate_player_info(self, p: dict) -> None:
+        self.rosterLocked = p['playerPoolEntry']['rosterLocked']
+        self.first = p['playerPoolEntry']['player']['firstName']
+        self.last = p['playerPoolEntry']['player']['lastName']
+        self.slot_id = p['lineupSlotId']
+        self.slot = slotID[self.slot_id]
+        if self.slot_id == 23:
+            self.slot_id = 7
+        self.starting = False if self.slot == 'B' else True
+        self.pos = positionID[
+            p['playerPoolEntry']
+            ['player']['defaultPositionId']
+        ]
+        try:
+            self.injured = (
+                p['playerPoolEntry']['player']['injured']
+            )
+            self.status = (
+                p['playerPoolEntry']['player']['injuryStatus']
+            )
+        except KeyError:
+            self.status = 'ACTIVE'
+            pass
+
+    def generate_player_stats(self, p: dict) -> None:
+        stats = p['playerPoolEntry']['player']['stats']
+        for stat in stats:
+            if stat['id'] == '00' + str(self.year):
+                # Current Year Stats
+                self.fpts_avg = round(stat['appliedAverage'], 1)
+                self.fpts_total = round(stat['appliedTotal'], 1)
+                self.total_yards = 0
+                self.completion_percentage = 0
+                self.tar_per_game = 0
+                self.tds = 0
+                touches = 0
+                if self.pos == 'QB':
+                    self.tar_per_game = '-'  # type: ignore
+                    self.total_yards += int(stat['stats']['3'])
+                    self.total_yards += int(stat['stats']['24'])
+                    att = stat['stats']['0']
+                    cmp = stat['stats']['1']
+                    self.completion_percentage = round((cmp / att) * 100, 1)
+                    self.tds += int(stat['stats']['4'])
+                elif self.pos in ['RB', 'WR', 'TE']:
+                    self.completion_percentage = '-'  # type: ignore
+                    try:
+                        # Rushes
+                        if stat['stats']['23']:
+                            touches += int(stat['stats']['23'])
+                            self.tar_per_game = int(touches / self.week)
+                            self.total_yards += int(stat['stats']['24'])
+                    except KeyError:
+                        pass
+                    try:
+                        # Receptions
+                        if stat['stats']['58']:
+                            touches += int(stat['stats']['58'])
+                            self.tar_per_game = int(touches / self.week)
+                            self.total_yards += int(stat['stats']['42'])
+                    except KeyError:
+                        pass
+                elif self.pos == 'DST':
+                    self.tar_per_game = '-'  # type: ignore
+                    self.total_yards = '-'  # type: ignore
+                    self.completion_percentage = '-'  # type: ignore
+                elif self.pos == 'K':
+                    self.tar_per_game = '-'  # type: ignore
+                    self.total_yards = '-'  # type: ignore
+                    fg_att = stat['stats']['84']
+                    fg_cmp = stat['stats']['83']
+                    xp_att = stat['stats']['87']
+                    xp_cmp = stat['stats']['86']
+                    self.completion_percentage = round(
+                        ((fg_cmp+xp_cmp) / (fg_att+xp_att)) * 100, 1,
+                    )
+                try:
+                    # Rushing TD
+                    if stat['stats']['25']:
+                        self.tds += int(stat['stats']['25'])
+                except KeyError:
+                    pass
+                try:
+                    # Receiving TD
+                    if stat['stats']['43']:
+                        self.tds += int(stat['stats']['43'])
+                except KeyError:
+                    pass
+
+            if stat['scoringPeriodId'] == self.week:
+                # Current Week Proj / Score
+                if stat['statSourceId'] == 0:
+                    self.score = round(stat['appliedTotal'], 1)
+                elif stat['statSourceId'] == 1:
+                    if stat['appliedTotal']:
+                        self.proj = round(stat['appliedTotal'], 1)
+                    else:
+                        self.proj = round(stat['appliedTotal'], 1)
+                        if not self.injured:
+                            self.status = 'BYE'
 
     def apply_color(self) -> None:
         color_starting = {True: Colors.BLUE, False: Colors.BLACK}
@@ -336,7 +391,7 @@ class Player(Roster):
         self.color_performance = color_performance[self.performance]
 
     def truncate(self) -> None:
-        if len(self.last) >= 12:
+        if len(self.last) >= 11:
             self.last = f'{self.last[:7]}...'
 
     def performance_check(self) -> None:
@@ -344,30 +399,50 @@ class Player(Roster):
         if self.rosterLocked:
             if self.score < (self.proj - spread):
                 self.performance = 'LOW'
-            elif (self.proj - spread) < self.score <= (self.proj + spread):
-                self.performance = 'MID'
             elif self.score > (self.proj + spread):
                 self.performance = 'HIGH'
             else:
-                self.performance = 'NAN'
+                self.performance = 'MID'
 
-    def __str__(self) -> str:
+    def print_player(self, ext: bool = False) -> str:
         self.apply_color()
         self.truncate()
-        return f'{self.color_starting}' \
-               f'{self.slot}:' \
-               f'{Colors.ENDC:<5}\t' \
-               f'{self.pos:<4}' \
-               f'{self.color_status:<4}' \
-               f'{self.first[0]}. ' \
-               f'{self.last:<8}' \
-               f'{Colors.ENDC}\t' \
-               f'{self.color_shouldStart}' \
-               f'{self.proj:>5}' \
-               f'{Colors.ENDC}\t' \
-               f'{self.color_performance}' \
-               f'{self.score :>6}' \
-               f'{Colors.ENDC}'.expandtabs(3)
+        if ext:
+            return f'{self.color_starting}' \
+                   f'{self.slot}:' \
+                   f'{Colors.ENDC:<5}\t' \
+                   f'{self.pos:<4}' \
+                   f'{self.color_status:<4}' \
+                   f'{self.first[0]}. ' \
+                   f'{self.last:<8}' \
+                   f'{Colors.ENDC}\t' \
+                   f'{self.color_shouldStart}' \
+                   f'{self.proj:>5}' \
+                   f'{Colors.ENDC}\t' \
+                   f'{self.color_performance}' \
+                   f'{self.score:>6}' \
+                   f'{Colors.ENDC}' \
+                   f'{self.tar_per_game:>8}' \
+                   f'{self.total_yards:>7}' \
+                   f'{self.completion_percentage:>7}' \
+                   f'{self.tds:>5}' \
+                   f'{self.fpts_avg:>9}' \
+                   f'{self.fpts_total:>8}'.expandtabs(3)
+        else:
+            return f'{self.color_starting}' \
+                   f'{self.slot}:' \
+                   f'{Colors.ENDC:<5}\t' \
+                   f'{self.pos:<4}' \
+                   f'{self.color_status:<4}' \
+                   f'{self.first[0]}. ' \
+                   f'{self.last:<8}' \
+                   f'{Colors.ENDC}\t' \
+                   f'{self.color_shouldStart}' \
+                   f'{self.proj:>5}' \
+                   f'{Colors.ENDC}\t' \
+                   f'{self.color_performance}' \
+                   f'{self.score:>6}' \
+                   f'{Colors.ENDC}'.expandtabs(3)
 
 
 def check_cookies_exists(path: str) -> None:
@@ -524,11 +599,11 @@ def print_matchup(myTeam: Roster, opTeam: Roster) -> None:
         ),
     ):
         if not myPlayer:
-            print(empty + sp + str(opPlayer))
+            print(empty + sp + opPlayer.print_player())
         elif not opPlayer:
-            print(str(myPlayer) + sp + empty)
+            print(myPlayer.print_player() + sp + empty)
         else:
-            print(str(myPlayer) + sp + str(opPlayer))
+            print(myPlayer.print_player() + sp + opPlayer.print_player())
     print(('\u2550'*36) + sp + ('\u2550'*36))
 
     yet_to_play1 = f'Yet to Play: {myTeam.yet_to_play}'

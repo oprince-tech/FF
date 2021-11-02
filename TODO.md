@@ -1,11 +1,12 @@
 ### Todo
-- [ ] Standard deviation of all position players to determine performance color?
 - [ ] Add player score from matchup to prevent previous weeks score
 
 - [ ] Lengthen D/ST team names
 - [ ] Tiebreak on decide flex decided on opp def or last week score or carries/YPC
 - [ ] LRU cache
-- [ ] Record
+- [ ] Stats: Touches / Yards / Yard per touch / AVG fpts / Total fpts
+
+- [ ] Scan free agents for better total fpts/avg fpts
 ### In Progress
 ### Completed
 - [x] argparse
@@ -22,3 +23,5 @@
 - [x] print_matchup case where roster lengths are not equal
 - [x] possible BYE week color
 - [x] Add owner to print_roster
+- [x] Record
+- [x] Standard deviation of all position players to determine performance color?
