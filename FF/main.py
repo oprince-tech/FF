@@ -147,14 +147,22 @@ class Roster:
             ),
         )
         flex_spot.sort(key=operator.attrgetter('proj'), reverse=True)
+        max_proj = flex_spot[0].proj
+        tiebreak1 = [p for p in flex_spot if p.proj == max_proj]
 
-        max = flex_spot[0].proj
-        tiebreak = [p for p in flex_spot if p.proj == max]
-
-        if len(tiebreak) >= 2:
-            tiebreak.sort(key=operator.attrgetter('fpts_avg'), reverse=True)
-            # need tiebreak for equal averages
-            flex = tiebreak[0]
+        if len(tiebreak1) >= 2:
+            tiebreak1.sort(key=operator.attrgetter('fpts_avg'), reverse=True)
+            max_fpts_avg = tiebreak1[0].fpts_avg
+            tiebreak2 = [p for p in tiebreak1 if p.fpts_avg == max_fpts_avg]
+            if len(tiebreak2) >= 2:
+                tiebreak2.sort(
+                    key=operator.attrgetter(
+                        'fpts_total',
+                    ), reverse=True,
+                )
+                flex = tiebreak2[0]
+            else:
+                flex = tiebreak1[0]
         else:
             flex = flex_spot[0]
         flex.shouldStart = True

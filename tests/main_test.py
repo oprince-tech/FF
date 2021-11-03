@@ -479,7 +479,22 @@ def test_sort_by_pos(mock_roster_three_players):
     assert mock_roster_three_players.roster[2].slot_id == 4
 
 
-def test_decide_flex_tiebreak(mock_roster_decide_flex_tiebreak):
+def test_decide_flex_tiebreak1(mock_roster_decide_flex_tiebreak):
+    mock_roster_decide_flex_tiebreak.roster[0].proj = 100.0
+    mock_roster_decide_flex_tiebreak.roster[0].fpts_avg = 100.0
+    mock_roster_decide_flex_tiebreak.roster[1].proj = 100.0
+    mock_roster_decide_flex_tiebreak.roster[1].fpts_avg = 200.0
+    mock_roster_decide_flex_tiebreak.decide_flex()
+    assert mock_roster_decide_flex_tiebreak.roster[1].shouldStart is True
+
+
+def test_decide_flex_tiebreak2(mock_roster_decide_flex_tiebreak):
+    mock_roster_decide_flex_tiebreak.roster[0].proj = 100.0
+    mock_roster_decide_flex_tiebreak.roster[0].fpts_avg = 100.0
+    mock_roster_decide_flex_tiebreak.roster[0].fpts_total = 200.0
+    mock_roster_decide_flex_tiebreak.roster[1].proj = 100.0
+    mock_roster_decide_flex_tiebreak.roster[1].fpts_avg = 100.0
+    mock_roster_decide_flex_tiebreak.roster[1].fpts_total = 100.0
     mock_roster_decide_flex_tiebreak.decide_flex()
     assert mock_roster_decide_flex_tiebreak.roster[0].shouldStart is True
 

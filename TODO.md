@@ -2,9 +2,7 @@
 - [ ] Add player score from matchup to prevent previous weeks score
 
 - [ ] Lengthen D/ST team names
-- [ ] Tiebreak on decide flex decided on opp def or last week score or carries/YPC
 - [ ] LRU cache
-- [ ] Stats: Touches / Yards / Yard per touch / AVG fpts / Total fpts
 
 - [ ] Scan free agents for better total fpts/avg fpts
 ### In Progress
@@ -25,3 +23,5 @@
 - [x] Add owner to print_roster
 - [x] Record
 - [x] Standard deviation of all position players to determine performance color?
+- [x] Stats: Touches / Yards / Yard per touch / AVG fpts / Total fpts
+- [x] Tiebreak2 based on total fantasy points
