@@ -638,11 +638,14 @@ def connect_FF(LID: int, wk: int, dev: bool) -> tuple[int, dict]:
     )
 
     try:
+        print('Connecting to API...')
         r = requests.get(
             url, params={'scoringPeriodId': str(wk)},
             cookies={'SWID': swid, 'espn_s2': espn_s2},
+            timeout=5,
         )
-        print(f'STATUS: {r.status_code}')
+        code_color = Colors.GREEN if r.status_code == 200 else Colors.RED
+        print(f'STATUS: {code_color}{r.status_code}{Colors.ENDC}')
         return r.status_code, r.json()
 
     except requests.exceptions.RequestException as e:
