@@ -558,7 +558,8 @@ def test_print_roster(mock_roster_one_player, capsys):
           '\x1b[94mFLX:\x1b[0m  RB  \x1b[32mN. ' \
           'Chubb   \x1b[0m   \x1b[90m 13.0\x1b[0m ' \
           '\x1b[32m  20.1\x1b[0m' \
-          '      29' \
+          '  14' \
+          '\x1b[90m   2\x1b[0m' \
           '    199' \
           '      -' \
           '    3' \

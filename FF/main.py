@@ -303,6 +303,7 @@ class Player(Roster):
         for stat in stats:
             if stat['id'] == '00' + str(self.year):
                 # Current Year Stats
+                self.games_played = int(stat['stats']['210'])
                 self.fpts_avg = round(stat['appliedAverage'], 1)
                 self.fpts_total = round(stat['appliedTotal'], 1)
                 self.total_yards = 0
@@ -322,20 +323,24 @@ class Player(Roster):
                     self.completion_percentage = '-'  # type: ignore
                     try:
                         # Rushes
-                        if stat['stats']['23']:
-                            touches += int(stat['stats']['23'])
-                            self.tar_per_game = int(touches / self.week)
-                            self.total_yards += int(stat['stats']['24'])
+                        touches += int(stat['stats']['23'])
+                        rush_yards = int(stat['stats']['24'])
                     except KeyError:
                         pass
+                    else:
+                        self.total_yards += rush_yards
+
                     try:
                         # Receptions
-                        if stat['stats']['58']:
-                            touches += int(stat['stats']['58'])
-                            self.tar_per_game = int(touches / self.week)
-                            self.total_yards += int(stat['stats']['42'])
+                        touches += int(stat['stats']['58'])
+                        rec_yards = int(stat['stats']['42'])
                     except KeyError:
                         pass
+                    else:
+                        self.total_yards += rec_yards
+
+                    self.tar_per_game = int(touches / self.games_played)
+
                 elif self.pos == 'DST':
                     self.tar_per_game = '-'  # type: ignore
                     self.total_yards = '-'  # type: ignore
@@ -352,14 +357,12 @@ class Player(Roster):
                     )
                 try:
                     # Rushing TD
-                    if stat['stats']['25']:
-                        self.tds += int(stat['stats']['25'])
+                    self.tds += int(stat['stats']['25'])
                 except KeyError:
                     pass
                 try:
                     # Receiving TD
-                    if stat['stats']['43']:
-                        self.tds += int(stat['stats']['43'])
+                    self.tds += int(stat['stats']['43'])
                 except KeyError:
                     pass
 
@@ -430,7 +433,10 @@ class Player(Roster):
                    f'{self.color_performance}' \
                    f'{self.score:>6}' \
                    f'{Colors.ENDC}' \
-                   f'{self.tar_per_game:>8}' \
+                   f'  {self.tar_per_game:>2}' \
+                   f'{Colors.BLACK}' \
+                   f'{self.games_played:>4}' \
+                   f'{Colors.ENDC}' \
                    f'{self.total_yards:>7}' \
                    f'{self.completion_percentage:>7}' \
                    f'{self.tds:>5}' \
