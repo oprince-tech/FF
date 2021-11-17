@@ -37,13 +37,15 @@ FF [-p] [-w WEEK] [-l LEAGUE_ID] [-t TEAM_ID] [-s SEASON] [-c] [--SWID SWID] [--
 |-w        |Week|
 |--SWID    |Your SWID (cookies)|
 |--espn_s2 |Your espn_s2 (cookie)|
+|-c        |Display your cookies|
 |-m        |View team's matchup|
 |-d        |Reads 'cookies-dev.json' (gitignored)|
 |-h        |Help|
 
 ## Accessing your cookies:
+1. Open dev tools (Cmd+Option+I (Mac) or Ctrl+Shift+I).
+2. Paste the SWID and espn_s2 values into the cookies.json file or after the --SWID / --espn_s2 flag.
 ### Chrome
 ![Chrome](Cookies_Chrome.png)
 ### Firefox
 ![Firefox](Cookies_Firefox.png)
-Paste the SWID and espn_s2 values into the cookies.json file or after the --SWID / --espn_s2 flag.
