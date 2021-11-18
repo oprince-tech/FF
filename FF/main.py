@@ -114,23 +114,25 @@ class Roster:
         for matchup in d['schedule']:
             if matchup['winner'] != 'UNDECIDED':
                 if (
-                    matchup['away']['teamId'] == self.TID and
-                    matchup['winner'] == 'AWAY'
+                    (
+                        matchup['away']['teamId'] == self.TID and
+                        matchup['winner'] == 'AWAY'
+                    ) or
+                    (
+                        matchup['home']['teamId'] == self.TID and
+                        matchup['winner'] == 'HOME'
+                    )
                 ):
                     self.wins += 1
                 elif (
-                    matchup['away']['teamId'] == self.TID and
-                    matchup['winner'] == 'HOME'
-                ):
-                    self.losses += 1
-                elif (
-                    matchup['home']['teamId'] == self.TID and
-                    matchup['winner'] == 'HOME'
-                ):
-                    self.wins += 1
-                elif (
-                    matchup['home']['teamId'] == self.TID and
-                    matchup['winner'] == 'AWAY'
+                    (
+                        matchup['away']['teamId'] == self.TID and
+                        matchup['winner'] == 'HOME'
+                    ) or
+                    (
+                        matchup['home']['teamId'] == self.TID and
+                        matchup['winner'] == 'AWAY'
+                    )
                 ):
                     self.losses += 1
 
