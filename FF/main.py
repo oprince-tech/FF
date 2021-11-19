@@ -226,15 +226,12 @@ class Roster:
                     else:
                         self.total_score = matchup['home']['totalPoints']
 
-    def get_total_projected(self) -> None:
+    def ytp_projected(self) -> None:
         self.total_projected = 0.0
+        self.yet_to_play = 0
         for p in self.roster:
             if p.starting:
                 self.total_projected += p.proj
-
-    def get_yet_to_play(self) -> None:
-        self.yet_to_play = 0
-        for p in self.roster:
             if p.starting and not p.rosterLocked:
                 self.yet_to_play += 1
 
@@ -750,8 +747,7 @@ def main() -> int:
     myTeam.generate_roster(d, args.season, args.week)
     myTeam.generate_record(d)
     myTeam.get_matchup_score(d, args.week)
-    myTeam.get_total_projected()
-    myTeam.get_yet_to_play()
+    myTeam.ytp_projected()
     myTeam.decide_lineup()
     myTeam.sort_roster_by_pos()
     if args.matchup:
@@ -759,8 +755,7 @@ def main() -> int:
         opTeam.generate_roster(d, args.season, args.week)
         opTeam.generate_record(d)
         opTeam.get_matchup_score(d, args.week)
-        opTeam.get_total_projected()
-        opTeam.get_yet_to_play()
+        opTeam.ytp_projected()
         opTeam.decide_lineup()
         opTeam.sort_roster_by_pos()
         print_matchup(myTeam, opTeam)

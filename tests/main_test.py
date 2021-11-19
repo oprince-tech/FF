@@ -528,18 +528,18 @@ def test_decide_lineup(index, last, mock_roster_full_team):
     assert mock_roster_full_team.roster[index].last == last
 
 
-def test_get_total_projected(mock_roster_full_team):
-    mock_roster_full_team.get_total_projected()
+def test_projected(mock_roster_full_team):
+    mock_roster_full_team.ytp_projected()
     assert mock_roster_full_team.total_projected == 91.8
 
 
-def test_get_yet_to_play(mock_roster_full_team_YTP):
-    mock_roster_full_team_YTP.get_yet_to_play()
+def test_ytp(mock_roster_full_team_YTP):
+    mock_roster_full_team_YTP.ytp_projected()
     assert mock_roster_full_team_YTP.yet_to_play == 9
 
 
 def test_get_yet_to_play_three_starting(mock_roster_three_players):
-    mock_roster_three_players.get_yet_to_play()
+    mock_roster_three_players.ytp_projected()
     assert mock_roster_three_players.yet_to_play == 3
 
 
@@ -965,8 +965,7 @@ def test_Roster_generate_record(mock_roster):
 @mock.patch('FF.main.Roster.print_roster')
 @mock.patch('FF.main.Roster.sort_roster_by_pos')
 @mock.patch('FF.main.Roster.decide_lineup')
-@mock.patch('FF.main.Roster.get_yet_to_play')
-@mock.patch('FF.main.Roster.get_total_projected')
+@mock.patch('FF.main.Roster.ytp_projected')
 @mock.patch('FF.main.Roster.get_matchup_score')
 @mock.patch('FF.main.Roster.generate_record')
 @mock.patch('FF.main.Roster.generate_roster')
@@ -980,8 +979,7 @@ def test_main(
     generate_roster,
     generate_record,
     get_matchup_score,
-    get_total_projected,
-    get_yet_to_play,
+    ytp_projected,
     decide_lineup,
     sort_roster_by_pos,
     print_roster,
@@ -995,8 +993,7 @@ def test_main(
 @mock.patch('FF.main.Roster.print_roster')
 @mock.patch('FF.main.Roster.sort_roster_by_pos')
 @mock.patch('FF.main.Roster.decide_lineup')
-@mock.patch('FF.main.Roster.get_yet_to_play')
-@mock.patch('FF.main.Roster.get_total_projected')
+@mock.patch('FF.main.Roster.ytp_projected')
 @mock.patch('FF.main.Roster.get_matchup_score')
 @mock.patch('FF.main.Roster.generate_record')
 @mock.patch('FF.main.Roster.generate_roster')
@@ -1010,8 +1007,7 @@ def test_main_dev(
     generate_roster,
     generate_record,
     get_matchup_score,
-    get_total_projected,
-    get_yet_to_play,
+    ytp_projected,
     decide_lineup,
     sort_roster_by_pos,
     print_roster,
@@ -1025,8 +1021,7 @@ def test_main_dev(
 @mock.patch('FF.main.print_matchup')
 @mock.patch('FF.main.Roster.sort_roster_by_pos')
 @mock.patch('FF.main.Roster.decide_lineup')
-@mock.patch('FF.main.Roster.get_yet_to_play')
-@mock.patch('FF.main.Roster.get_total_projected')
+@mock.patch('FF.main.Roster.ytp_projected')
 @mock.patch('FF.main.Roster.get_matchup_score')
 @mock.patch('FF.main.Roster.generate_record')
 @mock.patch('FF.main.Roster.generate_roster')
@@ -1040,8 +1035,7 @@ def test_main_matchup(
     generate_roster,
     generate_record,
     get_matchup_score,
-    get_total_projected,
-    get_yet_to_play,
+    ytp_projected,
     decide_lineup,
     sort_roster_by_pos,
     print_matchup,
